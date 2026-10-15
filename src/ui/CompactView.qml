@@ -19,6 +19,12 @@ Item {
     readonly property color muted: appTheme ? appTheme.textMuted : "#8E8E93"
     readonly property color label: appTheme ? appTheme.textLabel : "#FFFFFF"
     readonly property color chip: appTheme ? appTheme.cardHover : "#2C2C2E"
+    readonly property string autoIcon: (!isDark && activeMode !== "AUTO")
+        ? "qrc:/MSI/CoolerManager/resources/svg/balance-dark.svg"
+        : "qrc:/MSI/CoolerManager/resources/svg/balance-light.svg"
+    readonly property string manuelIcon: (!isDark && activeMode !== "MANUEL")
+        ? "qrc:/MSI/CoolerManager/resources/svg/fire-dark.svg"
+        : "qrc:/MSI/CoolerManager/resources/svg/fire-light.svg"
 
     Column {
         anchors.fill: parent
@@ -111,7 +117,7 @@ Item {
                 height: parent.height
                 label: qsTr("Auto")
                 isActive: compactView.activeMode === "AUTO"
-                iconSource: "qrc:/MSI/CoolerManager/resources/svg/balance-light.svg"
+                iconSource: compactView.autoIcon
                 appTheme: compactView.appTheme
                 onActivated: {
                     compactView.userInteracted()
@@ -128,7 +134,7 @@ Item {
                 detail: compactView.activeMode === "MANUEL"
                        ? (compactView.coolerBoostOn ? qsTr("Actif") : qsTr("Inactif"))
                        : ""
-                iconSource: "qrc:/MSI/CoolerManager/resources/svg/fire-light.svg"
+                iconSource: compactView.manuelIcon
                 appTheme: compactView.appTheme
                 onActivated: {
                     compactView.userInteracted()

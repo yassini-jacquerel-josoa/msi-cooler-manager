@@ -74,6 +74,8 @@ qt_add_executable(msi-cooler-manager
     src/ui/InputMask.h
     src/ui/GlobalHotkey.cpp
     src/ui/GlobalHotkey.h
+    src/ui/BackdropBlur.cpp
+    src/ui/BackdropBlur.h
 )
 
 target_link_libraries(msi-cooler-manager PRIVATE
@@ -106,6 +108,8 @@ qt_add_qml_module(msi-cooler-manager
         resources/svg/balance.svg
         resources/svg/fire-dark.svg
         resources/svg/fire-light.svg
+        resources/svg/fire-blue.svg
+        resources/icons/fire-blue.png
         resources/svg/balance-dark.svg
         resources/svg/balance-light.svg
 )

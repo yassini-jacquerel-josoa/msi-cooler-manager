@@ -41,6 +41,7 @@ public:
 
 public slots:
     void addReading(int cpuTemp, int gpuTemp);
+    void appendRestored(const QDateTime &timestamp, int cpuTemp, int gpuTemp);
     void clear();
 
 signals:

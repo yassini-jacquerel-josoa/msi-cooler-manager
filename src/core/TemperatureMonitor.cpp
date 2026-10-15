@@ -86,6 +86,13 @@ void TemperatureMonitor::addReading(int cpuTemp, int gpuTemp)
     emit readingAdded(cpuTemp, gpuTemp);
 }
 
+void TemperatureMonitor::appendRestored(const QDateTime &timestamp, int cpuTemp, int gpuTemp)
+{
+    m_history.append(Reading{timestamp, cpuTemp, gpuTemp});
+    while (m_history.size() > m_historySize)
+        m_history.removeFirst();
+}
+
 void TemperatureMonitor::clear()
 {
     m_history.clear();

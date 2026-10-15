@@ -40,6 +40,7 @@ private:
     QSqlDatabase m_db;
     QString m_dbPath;
     bool m_initialized;
+    int m_insertsSinceCleanup = 0;
 };
 
 } // namespace msi::db

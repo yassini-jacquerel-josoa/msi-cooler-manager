@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import MSI.Effects 1.0
 
 Window {
     id: root
@@ -70,11 +71,18 @@ Window {
             controller.start()
     }
 
+    function grabBackdrop() {
+        if (visible)
+            return
+        frost.capture(x, y, width, height)
+    }
+
     function reveal() {
         ensureRunning()
         shown = true
         presenceAnim.stop()
         presence = 0
+        grabBackdrop()
         visible = true
         raise()
         fadeInTimer.restart()
@@ -132,6 +140,8 @@ Window {
             fadeInTimer.stop()
             presenceAnim.stop()
             shown = true
+            presence = 0
+            grabBackdrop()
             presence = 1
             visible = true
             raise()
@@ -194,11 +204,12 @@ Window {
         }
     }
 
-    readonly property bool isDark: true
-    readonly property var theme: ({
-        bg: Qt.rgba(0, 0, 0, 0.62),
+    readonly property bool isDark: (typeof themeHelper !== "undefined") ? themeHelper.isDark : true
+    readonly property var darkTheme: ({
+        bg: Qt.rgba(0, 0, 0, 0.40),
         card: Qt.rgba(1, 1, 1, 0.10),
         cardHover: Qt.rgba(1, 1, 1, 0.16),
+        cardPressed: Qt.rgba(1, 1, 1, 0.24),
         cardActive: Qt.rgba(0.04, 0.52, 1, 0.78),
         cardActiveHover: Qt.rgba(0.25, 0.61, 1, 0.88),
         border: Qt.rgba(1, 1, 1, 0.20),
@@ -211,6 +222,24 @@ Window {
         iconManuel: "#FFFFFF",
         danger: "#FF453A"
     })
+    readonly property var lightTheme: ({
+        bg: Qt.rgba(1, 1, 1, 0.52),
+        card: Qt.rgba(0, 0, 0, 0.05),
+        cardHover: Qt.rgba(0, 0, 0, 0.09),
+        cardPressed: Qt.rgba(0, 0, 0, 0.14),
+        cardActive: Qt.rgba(0.04, 0.52, 1, 0.92),
+        cardActiveHover: Qt.rgba(0.20, 0.58, 1, 0.96),
+        border: Qt.rgba(0, 0, 0, 0.08),
+        borderSel: Qt.rgba(0.04, 0.52, 1, 0.9),
+        textLabel: "#1C1C1E",
+        textMuted: Qt.rgba(0.11, 0.11, 0.12, 0.55),
+        barTrack: Qt.rgba(0, 0, 0, 0.08),
+        barFill: Qt.rgba(0.04, 0.52, 1, 0.95),
+        iconAuto: "#1C1C1E",
+        iconManuel: "#1C1C1E",
+        danger: "#FF3B30"
+    })
+    readonly property var theme: isDark ? darkTheme : lightTheme
 
     // Données
     readonly property string activeMode: (typeof controller !== "undefined") ? controller.mode : "AUTO"
@@ -306,10 +335,24 @@ Window {
         Rectangle {
             anchors.fill: parent
             radius: 32
-            color: root.theme.bg
-            border.color: root.theme.border
-            border.width: 1
+            color: "transparent"
             clip: true
+
+            BackdropBlur {
+                id: frost
+                anchors.fill: parent
+                cornerRadius: 32
+                tint: root.theme.bg
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: 32
+                color: "transparent"
+                border.color: root.theme.border
+                border.width: 1
+                z: 3
+            }
 
             MouseArea {
                 anchors.fill: parent

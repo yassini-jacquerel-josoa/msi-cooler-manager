@@ -2,15 +2,51 @@
 
 #include <QApplication>
 #include <QIcon>
+#include <QImage>
+#include <QPainter>
+#include <QPixmap>
 
 namespace msi::ui {
+
+namespace {
+
+QIcon flameIcon()
+{
+    const QString path = QStringLiteral(":/MSI/CoolerManager/resources/icons/fire-blue.png");
+    QIcon icon;
+    QImage source;
+    source.load(path);
+    if (!source.isNull()) {
+        source = source.convertToFormat(QImage::Format_ARGB32);
+        for (int size : {16, 22, 24, 32, 48, 64}) {
+            QImage frame(size, size, QImage::Format_ARGB32);
+            frame.fill(Qt::transparent);
+            const QImage scaled = source.scaled(
+                size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            QPainter painter(&frame);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+            painter.drawImage((size - scaled.width()) / 2,
+                              (size - scaled.height()) / 2,
+                              scaled);
+            painter.end();
+            icon.addPixmap(QPixmap::fromImage(frame));
+        }
+    }
+    if (icon.isNull())
+        icon = QIcon(path);
+    return icon;
+}
+
+} // namespace
 
 TrayManager::TrayManager(QObject *parent)
     : QObject(parent)
     , m_trayIcon(new QSystemTrayIcon(this))
     , m_menu(new QMenu())
 {
-    m_trayIcon->setIcon(QIcon::fromTheme(QStringLiteral("utilities-terminal")));
+    const QIcon icon = flameIcon();
+    m_trayIcon->setIcon(icon);
+    QApplication::setWindowIcon(icon);
     m_trayIcon->setToolTip(QStringLiteral("MSI Cooler Manager"));
 
     setupMenu();
@@ -69,11 +105,8 @@ void TrayManager::updateTooltip(const QString &mode, int cpu, int gpu)
 
 void TrayManager::onActivated(QSystemTrayIcon::ActivationReason reason)
 {
-    if (reason == QSystemTrayIcon::Trigger) {
-        emit toggleModeRequested();
-    } else if (reason == QSystemTrayIcon::DoubleClick) {
+    if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
         emit showWindowRequested();
-    }
 }
 
 } // namespace msi::ui

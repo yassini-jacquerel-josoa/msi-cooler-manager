@@ -58,6 +58,8 @@ Rectangle {
                 height: 18
                 radius: 9
                 color: "#FFFFFF"
+                border.width: 1
+                border.color: Qt.rgba(0, 0, 0, 0.16)
             }
         }
     }

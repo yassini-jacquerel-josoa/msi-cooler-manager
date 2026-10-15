@@ -51,7 +51,7 @@ Rectangle {
             text: card.label
             font.pixelSize: large ? 17 : 15
             font.weight: Font.DemiBold
-            color: "#FFFFFF"
+            color: card.isActive ? "#FFFFFF" : (card.appTheme ? card.appTheme.textLabel : "#FFFFFF")
         }
     }
 
@@ -71,6 +71,7 @@ Rectangle {
         visible: text.length > 0
         font.pixelSize: card.large ? 13 : 12
         font.weight: Font.Medium
-        color: card.appTheme ? card.appTheme.textMuted : Qt.rgba(1, 1, 1, 0.55)
+        color: card.isActive ? Qt.rgba(1, 1, 1, 0.82)
+                              : (card.appTheme ? card.appTheme.textMuted : Qt.rgba(1, 1, 1, 0.55))
     }
 }

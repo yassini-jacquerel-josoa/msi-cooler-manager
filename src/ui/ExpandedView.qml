@@ -18,6 +18,12 @@ Item {
     readonly property color card: appTheme ? appTheme.card : "#1C1C1E"
     readonly property color chip: appTheme ? appTheme.cardHover : "#2C2C2E"
     readonly property color accent: appTheme ? appTheme.barFill : "#0A84FF"
+    readonly property string autoIcon: (!isDark && activeMode !== "AUTO")
+        ? "qrc:/MSI/CoolerManager/resources/svg/balance-dark.svg"
+        : "qrc:/MSI/CoolerManager/resources/svg/balance-light.svg"
+    readonly property string manuelIcon: (!isDark && activeMode !== "MANUEL")
+        ? "qrc:/MSI/CoolerManager/resources/svg/fire-dark.svg"
+        : "qrc:/MSI/CoolerManager/resources/svg/fire-light.svg"
 
     component RoundButton : Rectangle {
         property string glyph: ""
@@ -48,13 +54,15 @@ Item {
         width: 28
         height: 28
         radius: 14
-        color: area.containsMouse ? Qt.rgba(1, 1, 1, 0.24) : expandedView.chip
+        color: area.containsMouse
+              ? (expandedView.appTheme ? expandedView.appTheme.cardPressed : Qt.rgba(1, 1, 1, 0.24))
+              : expandedView.chip
         Text {
             anchors.centerIn: parent
             text: glyph
             font.pixelSize: 16
             font.weight: Font.Medium
-            color: "#FFFFFF"
+            color: expandedView.label
         }
         MouseArea {
             id: area
@@ -111,7 +119,7 @@ Item {
                 large: true
                 label: qsTr("Auto")
                 isActive: expandedView.activeMode === "AUTO"
-                iconSource: "qrc:/MSI/CoolerManager/resources/svg/balance-light.svg"
+                iconSource: expandedView.autoIcon
                 appTheme: expandedView.appTheme
                 onActivated: controller.setMode("AUTO")
             }
@@ -126,7 +134,7 @@ Item {
                 detail: expandedView.activeMode === "MANUEL"
                        ? (expandedView.coolerBoostOn ? qsTr("Actif") : qsTr("Inactif"))
                        : ""
-                iconSource: "qrc:/MSI/CoolerManager/resources/svg/fire-light.svg"
+                iconSource: expandedView.manuelIcon
                 appTheme: expandedView.appTheme
                 onActivated: {
                     if (expandedView.activeMode === "MANUEL")

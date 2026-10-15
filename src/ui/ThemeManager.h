@@ -2,8 +2,8 @@
 
 #include <QObject>
 #include <QColor>
-#include <QGuiApplication>
-#include <QPalette>
+
+class QProcess;
 
 namespace msi::ui {
 
@@ -39,8 +39,6 @@ public:
     QColor mutedTextColor() const;
     QColor dangerColor() const { return QColor(QStringLiteral("#FF453A")); }
 
-    Q_INVOKABLE void toggle();
-    Q_INVOKABLE void toggleTheme() { toggle(); }
     Q_INVOKABLE void detectSystemTheme();
 
 public slots:
@@ -52,8 +50,11 @@ signals:
     void themeChanged();
 
 private:
+    void startWatching();
+
     bool m_isDark;
     bool m_isSystemDark;
+    QProcess *m_watch = nullptr;
 };
 
 } // namespace msi::ui

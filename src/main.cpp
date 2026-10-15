@@ -4,6 +4,7 @@
 #include <QSurfaceFormat>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QtQml>
 #include <QLocalServer>
 #include <QLocalSocket>
 
@@ -15,11 +16,13 @@
 #include "core/SettingsManager.h"
 #include "core/HardwareAbstraction.h"
 #include "db/DatabaseManager.h"
+#include "db/MetricsRepository.h"
 #include "ui/ThemeManager.h"
 #include "ui/TrayManager.h"
 #include "ui/DesktopShortcuts.h"
 #include "ui/InputMask.h"
 #include "ui/GlobalHotkey.h"
+#include "ui/BackdropBlur.h"
 
 using namespace msi;
 
@@ -117,6 +120,13 @@ int main(int argc, char *argv[])
     QObject::connect(&controller, &core::CoolerBoostController::modeChanged,
                      &settings, [&settings](const QString &mode) {
                          settings.setDefaultMode(mode);
+                         settings.sync();
+                     });
+    QObject::connect(&controller, &core::CoolerBoostController::thresholdsChanged,
+                     &settings, [&settings](int cpu, int gpu) {
+                         settings.setCpuThreshold(cpu);
+                         settings.setGpuThreshold(gpu);
+                         settings.sync();
                      });
     if (settings.defaultMode() == QLatin1String("MANUEL"))
         controller.restoreMode(core::CoolerBoostController::Mode::Manual);
@@ -127,13 +137,30 @@ int main(int argc, char *argv[])
     else if (pendingCommand == QLatin1String("manual"))
         controller.setMode(QStringLiteral("MANUEL"));
 
+    // Historique : recharger la base, puis enregistrer chaque nouvelle mesure.
+    QObject::connect(&dbManager, &db::DatabaseManager::errorOccurred,
+                     [](const QString &msg) { qWarning() << "Database error:" << msg; });
+    if (dbManager.initialize()) {
+        tempMonitor.setHistorySize(settings.historySize());
+        db::MetricsRepository history(QSqlDatabase::database());
+        const auto saved = history.getHistory(tempMonitor.historySize());
+        for (const auto &entry : saved)
+            tempMonitor.appendRestored(entry.timestamp, entry.cpuTemp, entry.gpuTemp);
+    } else {
+        qWarning() << "Database init failed:" << dbManager.databasePath()
+                   << "(l'appli continue sans historique)";
+    }
+
+    QObject::connect(&controller, &core::CoolerBoostController::temperaturesChanged,
+                     &tempMonitor, &core::TemperatureMonitor::addReading);
+    QObject::connect(&controller, &core::CoolerBoostController::temperaturesChanged,
+                     &dbManager, [&dbManager, &controller](int cpu, int gpu) {
+                         dbManager.insertTemperature(cpu, gpu, controller.mode());
+                     });
+
     // En Auto, le calcul démarre tout de suite. En Manuel, on attend l'affichage.
     if (controller.modeEnum() == core::CoolerBoostController::Mode::Auto)
         controller.start();
-
-    // Connexions
-    QObject::connect(&controller, &core::CoolerBoostController::temperaturesChanged,
-                     &tempMonitor, &core::TemperatureMonitor::addReading);
 
     QObject *mainWindow = nullptr;
     QObject::connect(server, &QLocalServer::newConnection, [&]() {
@@ -159,15 +186,9 @@ int main(int argc, char *argv[])
         });
     });
 
-    // Initialisation DB (non bloquant)
-    QObject::connect(&dbManager, &db::DatabaseManager::errorOccurred,
-                     [](const QString &msg) { qWarning() << "Database error:" << msg; });
-    if (!dbManager.initialize()) {
-        qWarning() << "Database init failed:" << dbManager.databasePath()
-                   << "(l'appli continue sans historique)";
-    }
-
     // ── Moteur QML ────────────────────────────────────────────────────────
+    qmlRegisterType<ui::BackdropBlur>("MSI.Effects", 1, 0, "BackdropBlur");
+
     QQmlApplicationEngine engine;
 
     engine.rootContext()->setContextProperty(QStringLiteral("controller"), &controller);

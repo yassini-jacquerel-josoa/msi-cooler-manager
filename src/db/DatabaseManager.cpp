@@ -37,6 +37,7 @@ bool DatabaseManager::initialize()
         return false;
 
     m_initialized = true;
+    cleanupOldEntries(7);
     emit initializedSuccessfully();
     return true;
 }
@@ -108,6 +109,12 @@ bool DatabaseManager::insertTemperature(int cpuTemp, int gpuTemp, const QString 
         emit errorOccurred(query.lastError().text());
         return false;
     }
+
+    ++m_insertsSinceCleanup;
+    if (m_insertsSinceCleanup >= 3600) {
+        m_insertsSinceCleanup = 0;
+        cleanupOldEntries(7);
+    }
     return true;
 }
 
@@ -115,7 +122,8 @@ bool DatabaseManager::cleanupOldEntries(int maxAgeDays)
 {
     if (!m_initialized) return false;
 
-    const qint64 cutoff = QDateTime::currentSecsSinceEpoch() - (maxAgeDays * 86400);
+    const qint64 cutoff = QDateTime::currentSecsSinceEpoch()
+                          - static_cast<qint64>(maxAgeDays) * 86400;
 
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral("DELETE FROM temperature_log WHERE timestamp < :cutoff"));

@@ -37,7 +37,7 @@ Rectangle {
                 font.pixelSize: 20
                 font.weight: Font.DemiBold
                 color: tempCard.value >= tempCard.threshold
-                       ? "#FF453A"
+                       ? (tempCard.appTheme ? tempCard.appTheme.danger : "#FF453A")
                        : (tempCard.appTheme ? tempCard.appTheme.textLabel : "#FFFFFF")
             }
         }
@@ -52,7 +52,9 @@ Rectangle {
                 width: Math.min(parent.width, parent.width * Math.max(0, tempCard.value) / 100)
                 height: parent.height
                 radius: 2
-                color: tempCard.value >= tempCard.threshold ? "#FF453A" : tempCard.barColor
+                color: tempCard.value >= tempCard.threshold
+                       ? (tempCard.appTheme ? tempCard.appTheme.danger : "#FF453A")
+                       : tempCard.barColor
             }
         }
     }
