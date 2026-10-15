@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=MSI Cooler Manager
+Comment=Gestionnaire de Cooler Boost pour laptops MSI
+Exec=pkexec msi-cooler-manager
+Icon=msi-cooler-manager
+Categories=Utility;HardwareSettings;
+Terminal=false
+StartupNotify=true
