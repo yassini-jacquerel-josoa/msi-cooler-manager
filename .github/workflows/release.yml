@@ -66,6 +66,14 @@ jobs:
           tar -czf "dist/${PACKAGE}.tar.gz" -C "${STAGE}" .
           (cd dist && sha256sum "${PACKAGE}.tar.gz" > "${PACKAGE}.tar.gz.sha256")
           (cd dist && sha256sum "${PACKAGE}.tar.gz" > SHA256SUMS)
+          # install.sh télécharge l'archive source GitHub : sa somme doit
+          # figurer dans SHA256SUMS pour être vérifiée de bout en bout.
+          if curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz" -o src.tar.gz; then
+            sha256sum src.tar.gz >> dist/SHA256SUMS
+            rm -f src.tar.gz
+          else
+            echo "Archive source introuvable pour ${GITHUB_REF_NAME}."
+          fi
           cat "dist/SHA256SUMS"
 
       - name: Upload artifact

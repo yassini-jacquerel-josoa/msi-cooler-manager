@@ -96,7 +96,7 @@ sh install.sh --no-install    # compiler sans installer (aucun sudo)
 sh install.sh --help          # toutes les options
 ```
 
-Le script télécharge aussi le fichier `SHA256SUMS` publié avec la release et vérifie l'archive avant extraction ; une somme fournie explicitement via `MSI_SHA256` reste prioritaire. Le repli `git clone` reste utilisable mais n'offre pas cette vérification : un avertissement est alors affiché.
+Le fichier `SHA256SUMS` publié avec la release contient la somme de l'archive source GitHub attendue par `install.sh` (ainsi que celle du paquet) : le script le télécharge et vérifie l'archive avant extraction. Une somme fournie explicitement via `MSI_SHA256` reste prioritaire. Le repli `git clone` reste utilisable mais n'offre pas cette vérification : un avertissement est alors affiché.
 
 Le script est en POSIX sh (dash/bash/ash), détecte le gestionnaire de paquets (`apt`, `dnf`, `pacman`, `zypper`), télécharge les sources dans un répertoire temporaire (nettoyé à la fin) et vérifie la présence de `msi-ec`. Depuis un clone local, `./install.sh` utilise directement l'arbre de travail. Sans gestionnaire de paquets reconnu ou sans `sudo`, il affiche les prérequis du README et s'arrête.
 
