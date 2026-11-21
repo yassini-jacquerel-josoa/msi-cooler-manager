@@ -1,9 +1,7 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QString>
-#include <QFile>
-#include <QProcess>
-#include <QTextStream>
 
 namespace msi::core {
 
@@ -12,6 +10,9 @@ namespace msi::core {
  *
  * Fournit un accès uniforme aux capteurs et actionnaires matériels,
  * permettant le mocking pour les tests unitaires.
+ *
+ * Cette interface publique est volontairement inchangée : les contrôleurs
+ * et les mocks existants ne dépendent pas des détails d'implémentation sysfs.
  */
 class HardwareAbstraction
 {
@@ -28,8 +29,14 @@ public:
 /**
  * @brief Implémentation sysfs pour Linux.
  *
- * Lit les températures depuis /sys/class/thermal et nvidia-smi,
- * contrôle le cooler boost via /sys/devices/platform/msi-ec/cooler_boost.
+ * Sources utilisées (voir docs/HARDWARE.md) :
+ *  - CPU : zone thermique détectée dans /sys/class/thermal/thermal_zone* ;
+ *  - GPU : nvidia-smi si disponible, sinon capteur hwmon présomptif ;
+ *  - Cooler Boost : /sys/devices/platform/msi-ec/cooler_boost.
+ *
+ * Les méthodes virtuelles conservent leur contrat historique (-1/false en cas
+ * d'échec) pour ne pas perturber CoolerBoostController. Les accesseurs de
+ * diagnostic ci-dessous (hors de l'interface virtuelle) expliquent l'échec.
  */
 class SysfsHardware : public HardwareAbstraction
 {
@@ -37,58 +44,43 @@ public:
     SysfsHardware() = default;
     ~SysfsHardware() override = default;
 
-    int cpuTemperature() const override
-    {
-        // Lit /sys/class/thermal/thermal_zone0/temp (millidegrés)
-        QFile file(QStringLiteral("/sys/class/thermal/thermal_zone0/temp"));
-        if (!file.open(QIODevice::ReadOnly))
-            return -1;
+    int cpuTemperature() const override;
+    int gpuTemperature() const override;
+    bool coolerBoostState() const override;
+    bool setCoolerBoost(bool enabled) override;
 
-        QByteArray data = file.readAll().trimmed();
-        file.close();
+    // ── Diagnostics (spécifiques à SysfsHardware, hors interface virtuelle) ─
+    /** Résumé lisible des trois sous-systèmes, séparés par « | ». */
+    QString status() const;
+    /** Erreurs courantes concaténées ; message explicite si aucune erreur. */
+    QString lastError() const;
 
-        bool ok = false;
-        int raw = data.toInt(&ok);
-        return ok ? raw / 1000 : -1;
-    }
+    QString cpuStatus() const { return m_cpuStatus; }
+    QString gpuStatus() const { return m_gpuStatus; }
+    QString coolerBoostStatus() const { return m_coolerStatus; }
 
-    int gpuTemperature() const override
-    {
-        QProcess proc;
-        proc.start(QStringLiteral("nvidia-smi"),
-                   QStringList{QStringLiteral("--query-gpu=temperature.gpu"),
-                               QStringLiteral("--format=csv,noheader,nounits")});
-        if (!proc.waitForFinished(2000))
-            return -1;
+private:
+    enum class GpuBackend { Unknown, NvidiaSmi, Hwmon, Unavailable };
 
-        QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
-        bool ok = false;
-        int temp = out.toInt(&ok);
-        return ok ? temp : -1;
-    }
+    QString discoverCpuZone() const;
+    void detectGpuBackend(int &initialTemperature) const;
+    QString findGpuHwmonInput() const;
+    bool queryNvidiaSmi(int &temperatureC, QString &error) const;
+    void recordError(QString &field, const QString &message) const;
 
-    bool coolerBoostState() const override
-    {
-        QFile file(QStringLiteral("/sys/devices/platform/msi-ec/cooler_boost"));
-        if (!file.open(QIODevice::ReadOnly))
-            return false;
+    mutable QString m_cpuZone;
+    mutable QString m_cpuStatus = QStringLiteral("CPU : non interrogé.");
+    mutable QString m_cpuError;
+    mutable QElapsedTimer m_cpuScanTimer;
 
-        QByteArray data = file.readAll().trimmed();
-        file.close();
-        return data == "on" || data == "1";
-    }
+    mutable GpuBackend m_gpuBackend = GpuBackend::Unknown;
+    mutable QString m_gpuInputPath;
+    mutable QString m_gpuStatus = QStringLiteral("GPU : non interrogé.");
+    mutable QString m_gpuError;
+    mutable QElapsedTimer m_gpuScanTimer;
 
-    bool setCoolerBoost(bool enabled) override
-    {
-        QFile file(QStringLiteral("/sys/devices/platform/msi-ec/cooler_boost"));
-        if (!file.open(QIODevice::WriteOnly))
-            return false;
-
-        QByteArray value = enabled ? "1" : "0";
-        qint64 written = file.write(value);
-        file.close();
-        return written == value.size();
-    }
+    mutable QString m_coolerStatus = QStringLiteral("Cooler Boost : non interrogé.");
+    mutable QString m_coolerError;
 };
 
 } // namespace msi::core

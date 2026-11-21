@@ -15,6 +15,16 @@ class DesktopShortcuts
 public:
     static QString claimAltF7(const QString &executablePath);
     static bool installToggleCommand(const QString &executablePath);
+
+    /**
+     * @brief Restaure les raccourcis modifiés par claimAltF7()/installToggleCommand().
+     *
+     * Remet le raccourci GNOME « déplacer la fenêtre » tel qu'il était avant la
+     * modification et retire uniquement le raccourci personnalisé créé par MSI
+     * Cooler Manager. Les raccourcis des autres applications sont préservés.
+     * Appelable plusieurs fois sans effet supplémentaire.
+     */
+    static void restore();
 };
 
 } // namespace msi::ui

@@ -28,11 +28,6 @@ using namespace msi;
 
 int main(int argc, char *argv[])
 {
-    if (geteuid() != 0) {
-        std::fprintf(stderr, "MSI Cooler Manager doit être lancé avec sudo.\n");
-        return 1;
-    }
-
     QSurfaceFormat format = QSurfaceFormat::defaultFormat();
     format.setAlphaBufferSize(8);
     QSurfaceFormat::setDefaultFormat(format);
@@ -86,6 +81,13 @@ int main(int argc, char *argv[])
             return sendToRunning(socket);
     }
 
+    // Aucune instance n'écoute : seules les commandes CLI sont traitées avant
+    // ce point. Le contrôle matériel et le GUI ne démarrent qu'en root.
+    if (geteuid() != 0) {
+        std::fprintf(stderr, "MSI Cooler Manager doit être lancé avec sudo.\n");
+        return 1;
+    }
+
     QLocalServer::removeServer(serverName);
     QLocalServer *server = new QLocalServer(&app);
     if (!server->listen(serverName)) {
@@ -99,6 +101,9 @@ int main(int argc, char *argv[])
 
     // F7 ne doit plus être pris par « Déplacer la fenêtre » ni par un raccourci GNOME.
     ui::DesktopShortcuts::claimAltF7(QCoreApplication::applicationFilePath());
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
+        ui::DesktopShortcuts::restore();
+    });
     ui::GlobalHotkey hotkey;
     const bool globalHotkey = hotkey.install();
     if (!globalHotkey)
@@ -158,9 +163,9 @@ int main(int argc, char *argv[])
                          dbManager.insertTemperature(cpu, gpu, controller.mode());
                      });
 
-    // En Auto, le calcul démarre tout de suite. En Manuel, on attend l'affichage.
-    if (controller.modeEnum() == core::CoolerBoostController::Mode::Auto)
-        controller.start();
+    // Le monitoring démarre immédiatement dans tous les modes, y compris en
+    // MANUEL restauré : la fenêtre peut ne jamais être révélée par l'utilisateur.
+    controller.start();
 
     QObject *mainWindow = nullptr;
     QObject::connect(server, &QLocalServer::newConnection, [&]() {
@@ -207,6 +212,7 @@ int main(int argc, char *argv[])
 
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "QML load failed: no root objects";
+        ui::DesktopShortcuts::restore();
         return -1;
     }
 

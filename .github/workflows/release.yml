@@ -1,0 +1,75 @@
+name: Release package
+
+# Paquet local uniquement : déclenchement manuel, dépôt en artifact de workflow.
+# Aucune publication de release GitHub n'est effectuée.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build release tarball
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            qt6-base-dev \
+            qt6-base-dev-tools \
+            qt6-declarative-dev \
+            qt6-declarative-dev-tools \
+            libqt6sql6-sqlite \
+            libsqlite3-dev \
+            libx11-dev \
+            libxcb1-dev \
+            libxcb-keysyms1-dev \
+            libxkbcommon-x11-dev \
+            qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts
+
+      - name: Configure (Release)
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTS=ON
+          -DENABLE_WARNINGS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Create tarball and checksum
+        run: |
+          set -euo pipefail
+          PACKAGE="msi-cooler-manager-${GITHUB_REF_NAME}-${GITHUB_RUN_NUMBER}"
+          STAGE="${RUNNER_TEMP}/${PACKAGE}"
+          mkdir -p "${STAGE}" dist
+          cmake --install build --prefix "${STAGE}/usr"
+          tar -czf "dist/${PACKAGE}.tar.gz" -C "${STAGE}" .
+          (cd dist && sha256sum "${PACKAGE}.tar.gz" > "${PACKAGE}.tar.gz.sha256")
+          cat "dist/${PACKAGE}.tar.gz.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-cooler-manager-package
+          path: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14

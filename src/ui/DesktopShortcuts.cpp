@@ -2,6 +2,7 @@
 
 #include <QProcess>
 #include <QRegularExpression>
+#include <QStringList>
 
 namespace msi::ui {
 
@@ -30,6 +31,20 @@ struct MoveRebind {
     QString key;
     QString previous;
 };
+
+// État des modifications apportées pendant cette session, mémorisé pour restore().
+struct ClaimState {
+    bool moveRebound = false;
+    QString moveKey;
+    QString movePrevious;
+    bool customShortcutInstalled = false;
+};
+
+ClaimState &claimState()
+{
+    static ClaimState state;
+    return state;
+}
 
 bool usesF7(const QString &binding)
 {
@@ -153,6 +168,38 @@ MoveRebind rebindMoveShortcut()
     return {true, true, key, current.text};
 }
 
+/**
+ * Vérifie que le chemin personnalisé réservé à MSI Cooler Manager n'a pas été
+ * repris par une autre application. En l'absence de valeurs identifiables, le
+ * chemin est considéré comme libre (aucun raccourci tiers à préserver).
+ */
+bool ownsCustomShortcut()
+{
+    const QString path = QLatin1String(kCustomPath);
+    bool ours = false;
+    bool other = false;
+
+    const GsettingsResult name = readKey(QLatin1String(kCustomSchema), QStringLiteral("name"), path);
+    const QStringList names = name.ok ? parseStringArray(name.text) : QStringList{};
+    if (!names.isEmpty()) {
+        if (names.first().compare(QLatin1String(kShortcutName), Qt::CaseInsensitive) == 0)
+            ours = true;
+        else
+            other = true;
+    }
+
+    const GsettingsResult command = readKey(QLatin1String(kCustomSchema), QStringLiteral("command"), path);
+    const QStringList commands = command.ok ? parseStringArray(command.text) : QStringList{};
+    if (!commands.isEmpty()) {
+        if (commands.first().contains(QLatin1String("--toggle")))
+            ours = true;
+        else
+            other = true;
+    }
+
+    return ours || !other;
+}
+
 bool installCustomShortcut(const QString &command)
 {
     const QString path = QLatin1String(kCustomPath);
@@ -161,6 +208,8 @@ bool installCustomShortcut(const QString &command)
         return false;
 
     QStringList paths = parseStringArray(list.text);
+    if (paths.contains(path) && !ownsCustomShortcut())
+        return false; // chemin utilisé par une autre application : on n'y touche pas
     if (!paths.contains(path)) {
         paths.append(path);
         if (!writeKey(QLatin1String(kMediaSchema), QLatin1String(kCustomListKey), formatStringArray(paths)))
@@ -175,7 +224,7 @@ bool installCustomShortcut(const QString &command)
                        formatString(QLatin1String(kAppBinding)), path);
 }
 
-bool removeCustomShortcut()
+bool removeCustomShortcut(bool verifyOwnership = true)
 {
     const QString path = QLatin1String(kCustomPath);
     const GsettingsResult list = readKey(QLatin1String(kMediaSchema), QLatin1String(kCustomListKey));
@@ -184,6 +233,10 @@ bool removeCustomShortcut()
 
     QStringList paths = parseStringArray(list.text);
     if (!paths.contains(path))
+        return true;
+
+    // Ne supprimer que notre propre raccourci, jamais celui d'une autre application.
+    if (verifyOwnership && !ownsCustomShortcut())
         return true;
 
     paths.removeAll(path);
@@ -198,7 +251,15 @@ QString DesktopShortcuts::claimAltF7(const QString &executablePath)
     if (executablePath.isEmpty() || !gnomeSession())
         return {};
 
-    rebindMoveShortcut();
+    const MoveRebind rebind = rebindMoveShortcut();
+    ClaimState &state = claimState();
+    if (rebind.ok && rebind.changed) {
+        state.moveRebound = true;
+        state.moveKey = rebind.key;
+        state.movePrevious = rebind.previous;
+    }
+
+    // Nettoie un ancien raccourci MSI, mais jamais celui d'une autre application.
     removeCustomShortcut();
     return {};
 }
@@ -207,7 +268,28 @@ bool DesktopShortcuts::installToggleCommand(const QString &executablePath)
 {
     if (executablePath.isEmpty() || !gnomeSession())
         return false;
-    return installCustomShortcut(toggleCommand(executablePath));
+
+    const bool installed = installCustomShortcut(toggleCommand(executablePath));
+    if (installed)
+        claimState().customShortcutInstalled = true;
+    return installed;
+}
+
+void DesktopShortcuts::restore()
+{
+    ClaimState &state = claimState();
+    if (!state.moveRebound && !state.customShortcutInstalled)
+        return;
+
+    if (state.moveRebound && !state.moveKey.isEmpty() && !state.movePrevious.isEmpty())
+        writeKey(QLatin1String(kWmSchema), state.moveKey, state.movePrevious);
+
+    if (state.customShortcutInstalled) {
+        // Nous avons écrit ce raccourci pendant cette session : il nous appartient.
+        removeCustomShortcut(false);
+    }
+
+    state = ClaimState{};
 }
 
 } // namespace msi::ui

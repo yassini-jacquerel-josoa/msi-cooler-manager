@@ -111,11 +111,19 @@ void CoolerBoostController::start()
 
 void CoolerBoostController::restoreMode(Mode mode)
 {
-    if (m_mode == mode)
-        return;
+    if (m_mode != mode) {
+        m_mode = mode;
+        emit modeChanged(this->mode());
+    }
 
-    m_mode = mode;
-    emit modeChanged(this->mode());
+    if (m_mode == Mode::Manual) {
+        m_manualBoostEnabled = true;
+        applyManualBoost();
+    }
+
+    // Le monitoring doit tourner dans tous les modes : une session restaurée en
+    // MANUEL peut rester sans fenêtre, donc QML n'appellera jamais start().
+    start();
 }
 
 void CoolerBoostController::toggleMode()

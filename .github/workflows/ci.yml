@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+# Validation uniquement : aucun artifact publié, aucune release créée.
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test (Ubuntu)
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            qt6-base-dev \
+            qt6-base-dev-tools \
+            qt6-declarative-dev \
+            qt6-declarative-dev-tools \
+            libqt6sql6-sqlite \
+            libsqlite3-dev \
+            libx11-dev \
+            libxcb1-dev \
+            libxcb-keysyms1-dev \
+            libxkbcommon-x11-dev \
+            qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTS=ON
+          -DENABLE_WARNINGS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: QML lint (if available)
+        run: |
+          if command -v qmllint >/dev/null 2>&1; then
+            echo "Running qmllint on src/ui/*.qml"
+            set +e
+            qmllint src/ui/*.qml
+            lint_status=$?
+            set -e
+            if [ "$lint_status" -ne 0 ]; then
+              # MSI.Effects est enregistré en C++ à l'exécution : qmllint ne
+              # peut pas le résoudre. On signale sans bloquer la validation.
+              echo "::warning::qmllint a signalé des problèmes (module C++ MSI.Effects non visible par le linter)."
+            fi
+          else
+            echo "qmllint not available; skipping QML lint"
+          fi
