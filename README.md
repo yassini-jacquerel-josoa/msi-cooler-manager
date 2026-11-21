@@ -96,7 +96,11 @@ sh install.sh --no-install    # compiler sans installer (aucun sudo)
 sh install.sh --help          # toutes les options
 ```
 
-Le fichier `SHA256SUMS` publié avec la release contient la somme de l'archive source GitHub attendue par `install.sh` (ainsi que celle du paquet) : le script le télécharge et vérifie l'archive avant extraction. Une somme fournie explicitement via `MSI_SHA256` reste prioritaire. Le repli `git clone` reste utilisable mais n'offre pas cette vérification : un avertissement est alors affiché.
+Pour une release, `install.sh` télécharge l'archive source produite par le workflow avec `git archive` et le fichier `SHA256SUMS`, tous deux publiés comme assets de la release. Ce fichier contient la somme de l'archive source et celle du paquet. Le script vérifie la somme avant extraction et **s'arrête** si `SHA256SUMS` est introuvable, si l'entrée de l'archive y est absente ou si la somme ne correspond pas. Une somme fournie explicitement via `MSI_SHA256` reste prioritaire sur `SHA256SUMS`.
+
+`MSI_SKIP_VERIFY=1` permet de passer outre cette vérification, avec un avertissement visible : c'est déconseillé, car cela supprime la protection contre une archive altérée.
+
+Pour une référence sans release (par exemple `--ref main`), aucun asset vérifiable n'existe : le script retombe sur l'archive auto-générée par GitHub avec un avertissement explicite (contenu non garanti stable), et le repli `git clone` reste utilisable avec son avertissement existant.
 
 Le script est en POSIX sh (dash/bash/ash), détecte le gestionnaire de paquets (`apt`, `dnf`, `pacman`, `zypper`), télécharge les sources dans un répertoire temporaire (nettoyé à la fin) et vérifie la présence de `msi-ec`. Depuis un clone local, `./install.sh` utilise directement l'arbre de travail. Sans gestionnaire de paquets reconnu ou sans `sudo`, il affiche les prérequis du README et s'arrête.
 

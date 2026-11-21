@@ -2,13 +2,14 @@
 #
 # install.sh — Installation de MSI Cooler Manager
 #
-# Usage (one-liner) :
-#   curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh | sh
+# Usage : télécharger, inspecter, puis exécuter :
+#   curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh -o install.sh
+#   less install.sh
+#   sh install.sh
 #
-# Avec des options (le script est lu depuis stdin, on passe les arguments
-# après un "--") :
-#   curl -fsSL .../install.sh | sh -s -- --ref main
-#   curl -fsSL .../install.sh | sh -s -- --skip-tests
+# Avec des options :
+#   sh install.sh --ref main
+#   sh install.sh --skip-tests
 #
 # Depuis un checkout local (le téléchargement est alors ignoré) :
 #   ./install.sh
@@ -29,6 +30,7 @@ ARCHIVE_URL="https://github.com/${REPO}/archive"
 #   MSI_NO_INSTALL=1    compiler sans installer (pas de sudo nécessaire)
 #   MSI_KEEP_BUILD=1    conserver le répertoire de compilation
 #   MSI_SHA256=hex      somme de contrôle attendue de l'archive téléchargée
+#   MSI_SKIP_VERIFY=1   ignorer la vérification SHA-256 (déconseillé)
 # MSI_REF permet de choisir une autre référence (branche ou tag).
 MSI_REF="${MSI_REF:-v1.0.1}"
 MSI_PREFIX="${MSI_PREFIX:-}"
@@ -62,7 +64,8 @@ install.sh — installe MSI Cooler Manager depuis les sources.
 
 Usage :
   ./install.sh [options]
-  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh -s -- [options]
+  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh -o install.sh
+  sh install.sh [options]      # après inspection du script
 
 Options :
   -h, --help        afficher cette aide
@@ -77,7 +80,8 @@ Options :
 Variables d'environnement équivalentes :
   MSI_REF, MSI_PREFIX, MSI_JOBS, MSI_SKIP_TESTS, MSI_NO_DEPS, MSI_NO_INSTALL,
   MSI_KEEP_BUILD (valeur 1 pour activer), MSI_SHA256 (somme de contrôle de
-  l'archive, ex. publiée dans les notes de version).
+  l'archive, prioritaire sur SHA256SUMS), MSI_SKIP_VERIFY=1 (ignorer la
+  vérification d'intégrité — déconseillé).
 
 Après installation :
   sudo msi-cooler-manager          # nouvelle instance (droits root requis)
