@@ -2,7 +2,7 @@
 
 Gestionnaire de Cooler Boost pour laptops MSI — Qt6/QML, C++20.
 
-> **v1.0.1** : Linux uniquement (X11, ou XWayland) ; le démarrage d'une nouvelle instance exige les droits root. Voir [Limitations connues](#limitations-connues) et [docs/HARDWARE.md](docs/HARDWARE.md) pour la compatibilité matérielle documentée.
+> **v1.0.2** : Linux uniquement (X11, ou XWayland) ; le démarrage d'une nouvelle instance exige les droits root. Voir [Limitations connues](#limitations-connues) et [docs/HARDWARE.md](docs/HARDWARE.md) pour la compatibilité matérielle documentée.
 
 ## Démonstration
 
@@ -72,7 +72,7 @@ ctest --output-on-failure
 
 ### Télécharger, inspecter, exécuter
 
-Le script `install.sh` installe les dépendances, récupère les sources de la **release `v1.0.1`** (référence par défaut), compile, exécute les tests et installe. Téléchargez-le, lisez-le, puis exécutez-le :
+Le script `install.sh` installe les dépendances, récupère les sources de la **release `v1.0.2`** (référence par défaut), compile, exécute les tests et installe. Téléchargez-le, lisez-le, puis exécutez-le :
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh -o install.sh
@@ -83,7 +83,7 @@ sh install.sh
 Le script étant versionné, il peut aussi être épinglé sur la release :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/v1.0.1/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/v1.0.2/install.sh -o install.sh
 sh install.sh
 ```
 
@@ -96,7 +96,7 @@ sh install.sh --no-install    # compiler sans installer (aucun sudo)
 sh install.sh --help          # toutes les options
 ```
 
-Le mode est choisi d'après la référence demandée, pas d'après le résultat d'un téléchargement. Une référence de la forme `v<chiffres>…` (défaut : `v1.0.1`) est une **release** : `install.sh` télécharge l'archive source produite par le workflow avec `git archive` et le fichier `SHA256SUMS`, tous deux publiés comme assets de la release. Ce fichier contient la somme de l'archive source et celle du paquet. Le script **s'arrête avec une erreur** si l'asset source est introuvable, si `SHA256SUMS` est introuvable, si l'entrée de l'archive y est absente ou si la somme ne correspond pas. Une somme fournie explicitement via `MSI_SHA256` reste prioritaire sur `SHA256SUMS`.
+Le mode est choisi d'après la référence demandée, pas d'après le résultat d'un téléchargement. Une référence de la forme `v<chiffres>…` (défaut : `v1.0.2`) est une **release** : `install.sh` télécharge l'archive source produite par le workflow avec `git archive` et le fichier `SHA256SUMS`, tous deux publiés comme assets de la release. Ce fichier contient la somme de l'archive source et celle du paquet. Le script **s'arrête avec une erreur** si l'asset source est introuvable, si `SHA256SUMS` est introuvable, si l'entrée de l'archive y est absente ou si la somme ne correspond pas. Une somme fournie explicitement via `MSI_SHA256` reste prioritaire sur `SHA256SUMS`.
 
 `MSI_SKIP_VERIFY=1` permet de passer outre la vérification de la somme, avec un avertissement visible : c'est déconseillé, car cela supprime la protection contre une archive altérée. Il est **incompatible avec `MSI_SHA256`** : si les deux sont fournis, le script s'arrête, car une somme explicite doit toujours être vérifiée. L'asset de release reste obligatoire même avec `MSI_SKIP_VERIFY=1`.
 
@@ -179,7 +179,7 @@ Les règles de compilation, de test et de signalement sont décrites dans [CONTR
 
 ## Release
 
-La version **v1.0.1** est la version courante (`project(... VERSION 1.0.1)`, `CMakeLists.txt:4`) ; **v1.0.0** est la première version publique du projet. Le détail des changements figure dans [CHANGELOG.md](CHANGELOG.md).
+La version **v1.0.2** est la version courante (`project(... VERSION 1.0.2)`, `CMakeLists.txt:4`) ; **v1.0.0** est la première version publique du projet. Le détail des changements figure dans [CHANGELOG.md](CHANGELOG.md).
 
 ## Licence
 

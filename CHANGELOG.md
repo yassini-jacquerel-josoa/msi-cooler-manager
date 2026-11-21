@@ -7,6 +7,22 @@ et le projet adhère au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-21
+
+### Added
+
+- Hook `pre-commit` local (non versionné) exécutant `gitleaks git --pre-commit --staged --redact -v`, et motifs `.env`, clés privées et keystores ajoutés à `.gitignore`.
+- Publication des assets de release par `release.yml` : archive source produite avec `git archive`, paquet et `SHA256SUMS`. Le workflow est déclenché par le push d'un tag `v*`, avec `contents: write` limité au job de publication.
+
+### Changed
+
+- `install.sh` vérifie l'intégrité de l'archive source pour toute référence de release (`v<chiffres>…`) : l'asset doit être présent et sa somme doit correspondre à `SHA256SUMS`, sinon l'installation s'arrête. `MSI_SHA256` reste prioritaire ; `MSI_SKIP_VERIFY=1` et `MSI_ALLOW_UNVERIFIED=1` sont des contournements explicites et déconseillés. Le mode est déterminé par la référence demandée, pas par le résultat d'un téléchargement.
+- Référence d'installation par défaut portée à **`v1.0.2`**, et procédure remplacée par : télécharger le script, l'inspecter, puis l'exécuter.
+
+### Security
+
+- IPC : authentification des pairs via `SO_PEERCRED` (UID root ou UID de la session ayant lancé l'instance), socket local créé en 0600, commande `quit` réservée à root, connexions non autorisées refusées et journalisées.
+
 ## [1.0.1] - 2026-11-21
 
 ### Added
