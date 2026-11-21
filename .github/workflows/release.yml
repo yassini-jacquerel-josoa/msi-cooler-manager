@@ -4,6 +4,9 @@ name: Release package
 # publiés comme assets de la release GitHub (en plus de l'artifact de workflow).
 # À déclencher sur un tag : le nom du tag sert de nom de release et d'asset.
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -12,6 +15,9 @@ permissions:
 jobs:
   package:
     name: Build release tarball
+    # Publication réservée aux tags v* : un dispatch manuel sur une branche
+    # ne doit ni créer de release ni publier d'assets.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write

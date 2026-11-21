@@ -90,17 +90,17 @@ sh install.sh
 Options utiles (à passer à `sh install.sh`) :
 
 ```bash
-sh install.sh --ref main      # dernière version de développement
+MSI_ALLOW_UNVERIFIED=1 sh install.sh --ref main   # branche, non vérifiée
 sh install.sh --skip-tests    # ne pas exécuter ctest
 sh install.sh --no-install    # compiler sans installer (aucun sudo)
 sh install.sh --help          # toutes les options
 ```
 
-Pour une release, `install.sh` télécharge l'archive source produite par le workflow avec `git archive` et le fichier `SHA256SUMS`, tous deux publiés comme assets de la release. Ce fichier contient la somme de l'archive source et celle du paquet. Le script vérifie la somme avant extraction et **s'arrête** si `SHA256SUMS` est introuvable, si l'entrée de l'archive y est absente ou si la somme ne correspond pas. Une somme fournie explicitement via `MSI_SHA256` reste prioritaire sur `SHA256SUMS`.
+Le mode est choisi d'après la référence demandée, pas d'après le résultat d'un téléchargement. Une référence de la forme `v<chiffres>…` (défaut : `v1.0.1`) est une **release** : `install.sh` télécharge l'archive source produite par le workflow avec `git archive` et le fichier `SHA256SUMS`, tous deux publiés comme assets de la release. Ce fichier contient la somme de l'archive source et celle du paquet. Le script **s'arrête avec une erreur** si l'asset source est introuvable, si `SHA256SUMS` est introuvable, si l'entrée de l'archive y est absente ou si la somme ne correspond pas. Une somme fournie explicitement via `MSI_SHA256` reste prioritaire sur `SHA256SUMS`.
 
-`MSI_SKIP_VERIFY=1` permet de passer outre cette vérification, avec un avertissement visible : c'est déconseillé, car cela supprime la protection contre une archive altérée.
+`MSI_SKIP_VERIFY=1` permet de passer outre la vérification de la somme, avec un avertissement visible : c'est déconseillé, car cela supprime la protection contre une archive altérée. Il est **incompatible avec `MSI_SHA256`** : si les deux sont fournis, le script s'arrête, car une somme explicite doit toujours être vérifiée. L'asset de release reste obligatoire même avec `MSI_SKIP_VERIFY=1`.
 
-Pour une référence sans release (par exemple `--ref main`), aucun asset vérifiable n'existe : le script retombe sur l'archive auto-générée par GitHub avec un avertissement explicite (contenu non garanti stable), et le repli `git clone` reste utilisable avec son avertissement existant.
+Pour une autre référence (une branche, par exemple `--ref main`), aucun asset vérifiable n'existe : le script refuse d'installer sauf confirmation explicite `MSI_ALLOW_UNVERIFIED=1`. Il utilise alors l'archive auto-générée par GitHub avec un avertissement (contenu non garanti stable), et le repli `git clone` reste utilisable avec son avertissement existant.
 
 Le script est en POSIX sh (dash/bash/ash), détecte le gestionnaire de paquets (`apt`, `dnf`, `pacman`, `zypper`), télécharge les sources dans un répertoire temporaire (nettoyé à la fin) et vérifie la présence de `msi-ec`. Depuis un clone local, `./install.sh` utilise directement l'arbre de travail. Sans gestionnaire de paquets reconnu ou sans `sudo`, il affiche les prérequis du README et s'arrête.
 

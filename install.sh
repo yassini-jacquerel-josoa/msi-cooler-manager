@@ -31,6 +31,7 @@ ARCHIVE_URL="https://github.com/${REPO}/archive"
 #   MSI_KEEP_BUILD=1    conserver le répertoire de compilation
 #   MSI_SHA256=hex      somme de contrôle attendue de l'archive téléchargée
 #   MSI_SKIP_VERIFY=1   ignorer la vérification SHA-256 (déconseillé)
+#   MSI_ALLOW_UNVERIFIED=1  autoriser une branche sans release (non vérifié)
 # MSI_REF permet de choisir une autre référence (branche ou tag).
 MSI_REF="${MSI_REF:-v1.0.1}"
 MSI_PREFIX="${MSI_PREFIX:-}"
@@ -81,7 +82,8 @@ Variables d'environnement équivalentes :
   MSI_REF, MSI_PREFIX, MSI_JOBS, MSI_SKIP_TESTS, MSI_NO_DEPS, MSI_NO_INSTALL,
   MSI_KEEP_BUILD (valeur 1 pour activer), MSI_SHA256 (somme de contrôle de
   l'archive, prioritaire sur SHA256SUMS), MSI_SKIP_VERIFY=1 (ignorer la
-  vérification d'intégrité — déconseillé).
+  vérification d'intégrité — déconseillé, incompatible avec MSI_SHA256),
+  MSI_ALLOW_UNVERIFIED=1 (autoriser une référence sans release).
 
 Après installation :
   sudo msi-cooler-manager          # nouvelle instance (droits root requis)
@@ -104,6 +106,16 @@ while [ $# -gt 0 ]; do
         *)              usage >&2; die "Option inconnue : $1" ;;
     esac
 done
+
+check_verification_options() {
+    # Une somme fournie à la main doit toujours être vérifiée : MSI_SKIP_VERIFY
+    # ne peut pas la neutraliser.
+    if [ -n "$MSI_SHA256" ] && [ "${MSI_SKIP_VERIFY:-0}" = "1" ]; then
+        die "MSI_SHA256 et MSI_SKIP_VERIFY=1 sont incompatibles : la somme fournie doit toujours être vérifiée."
+    fi
+}
+
+check_verification_options
 
 # ── Nettoyage ─────────────────────────────────────────────────────────────────
 WORK_DIR=""
@@ -309,6 +321,30 @@ verify_release_archive() { # $1 = archive, $2 = URL de SHA256SUMS, $3 = nom de l
     check_sha256 "$expected" "$1"
 }
 
+# Le mode dépend de la forme de la référence demandée, jamais du résultat d'un
+# téléchargement : 'v' suivi d'un chiffre désigne une release.
+is_release_ref() { # $1 = référence
+    case "$1" in
+        v[0-9]*) return 0 ;;
+        *)       return 1 ;;
+    esac
+}
+
+require_unverified_consent() {
+    if [ "${MSI_ALLOW_UNVERIFIED:-0}" = "1" ]; then
+        warn "Référence '${MSI_REF}' sans release : installation non vérifiée (MSI_ALLOW_UNVERIFIED=1)."
+        return 0
+    fi
+    die "Référence '${MSI_REF}' sans release : installation non vérifiée refusée. Confirmez avec MSI_ALLOW_UNVERIFIED=1 (déconseillé)."
+}
+
+require_release_archive() { # $1 = chemin de l'archive
+    if ! download "${release_base}/${source_asset}" "$1" >/dev/null 2>&1; then
+        die "Asset de release introuvable (${release_base}/${source_asset}) : installation interrompue."
+    fi
+    verify_release_archive "$1" "${release_base}/SHA256SUMS" "$source_asset"
+}
+
 fetch_source() {
     WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/msi-cooler-manager.XXXXXX") \
         || die "Impossible de créer un répertoire temporaire."
@@ -318,12 +354,9 @@ fetch_source() {
     source_asset="msi-cooler-manager-${MSI_REF}-src.tar.gz"
     release_base="https://github.com/${REPO}/releases/download/${MSI_REF}"
 
-    # L'asset de release est la source de vérité : son existence signale une
-    # release, et son absence une référence sans release (une branche, par
-    # exemple). On ne retombe sur l'archive auto-générée que dans ce second cas.
-    if download "${release_base}/${source_asset}" "$archive" >/dev/null 2>&1; then
-        info "Archive de release détectée : ${source_asset}"
-        verify_release_archive "$archive" "${release_base}/SHA256SUMS" "$source_asset"
+    if is_release_ref "$MSI_REF"; then
+        info "Référence de release : ${MSI_REF} (vérification d'intégrité obligatoire)"
+        require_release_archive "$archive"
         mkdir -p "$WORK_DIR/src"
         if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
             extracted=1
@@ -331,7 +364,9 @@ fetch_source() {
             die "Archive de release invalide : extraction impossible."
         fi
     else
-        warn "Aucune archive de release pour '${MSI_REF}' : repli sur l'archive auto-générée par GitHub (contenu non garanti stable, intégrité non vérifiable)."
+        # Branche ou référence non versionnée : aucun asset vérifiable, il faut
+        # une confirmation explicite avant d'utiliser l'archive auto-générée.
+        require_unverified_consent
         # La référence peut être une branche (refs/heads) ou un tag (refs/tags).
         for kind in heads tags; do
             if download "$ARCHIVE_URL/refs/$kind/$MSI_REF.tar.gz" "$archive" >/dev/null 2>&1; then
