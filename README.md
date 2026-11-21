@@ -64,11 +64,41 @@ ctest --output-on-failure
 
 ## Installation
 
+### En une ligne
+
+Le script `install.sh` installe les dépendances, récupère les sources de la **release `v1.0.0`** (référence par défaut), compile, exécute les tests et installe :
+
 ```bash
+curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh | sh
+```
+
+Le script étant versionné, il peut aussi être épinglé sur la release :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/v1.0.0/install.sh | sh
+```
+
+Options utiles (à passer après `sh -s --`) :
+
+```bash
+curl -fsSL .../install.sh | sh -s -- --ref main      # dernière version de développement
+curl -fsSL .../install.sh | sh -s -- --skip-tests    # ne pas exécuter ctest
+curl -fsSL .../install.sh | sh -s -- --no-install    # compiler sans installer (aucun sudo)
+curl -fsSL .../install.sh | sh -s -- --help          # toutes les options
+```
+
+Le script est en POSIX sh (dash/bash/ash), détecte le gestionnaire de paquets (`apt`, `dnf`, `pacman`, `zypper`), télécharge les sources dans un répertoire temporaire (nettoyé à la fin) et vérifie la présence de `msi-ec`. Depuis un clone local, `./install.sh` utilise directement l'arbre de travail. Sans gestionnaire de paquets reconnu ou sans `sudo`, il affiche les prérequis du README et s'arrête.
+
+### Manuellement
+
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . -j$(nproc)
 sudo cmake --install .
 ```
 
-Le lanceur `msi-cooler-manager.desktop` est installé dans `share/applications` (`CMakeLists.txt:132-133`).
+Dans les deux cas, le lanceur `msi-cooler-manager.desktop` est installé dans `share/applications` (`CMakeLists.txt:132-133`).
 
 ## Utilisation
 

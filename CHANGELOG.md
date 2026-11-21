@@ -7,7 +7,9 @@ et le projet adhère au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-Rien de prévu pour l'instant.
+### Added
+
+- Script d'installation `install.sh` exécutable en une ligne (`curl -fsSL .../install.sh | sh`) : installation des dépendances via `apt`/`dnf`/`pacman`/`zypper`, téléchargement des sources de la release **`v1.0.0`** par défaut (option `--ref` pour une autre branche ou un tag), compilation, tests et installation, avec options `--ref`, `--prefix`, `--jobs`, `--skip-tests`, `--no-deps`, `--no-install` et `--keep-build`.
 
 ## [1.0.0] - 2026-11-21
 

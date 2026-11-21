@@ -21,6 +21,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate install script
+        run: |
+          sh -n install.sh
+          sh install.sh --help >/dev/null
+
       - name: Install dependencies
         run: |
           sudo apt-get update
