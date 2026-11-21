@@ -2,13 +2,14 @@
 #
 # install.sh — Installation de MSI Cooler Manager
 #
-# Usage (one-liner) :
-#   curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh | sh
+# Usage : télécharger, inspecter, puis exécuter :
+#   curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh -o install.sh
+#   less install.sh
+#   sh install.sh
 #
-# Avec des options (le script est lu depuis stdin, on passe les arguments
-# après un "--") :
-#   curl -fsSL .../install.sh | sh -s -- --ref main
-#   curl -fsSL .../install.sh | sh -s -- --skip-tests
+# Avec des options :
+#   sh install.sh --ref main
+#   sh install.sh --skip-tests
 #
 # Depuis un checkout local (le téléchargement est alors ignoré) :
 #   ./install.sh
@@ -21,7 +22,7 @@ REPO_URL="https://github.com/${REPO}.git"
 ARCHIVE_URL="https://github.com/${REPO}/archive"
 
 # ── Défauts, surchargeables par variables d'environnement ─────────────────────
-#   MSI_REF=v1.0.1      référence Git à installer (branche ou tag)
+#   MSI_REF=v1.0.2      référence Git à installer (branche ou tag)
 #   MSI_PREFIX=         préfixe d'installation (défaut : préfixe CMake, /usr/local)
 #   MSI_JOBS=n          nombre de cœurs de compilation parallèle
 #   MSI_SKIP_TESTS=1    ne pas exécuter ctest
@@ -29,8 +30,10 @@ ARCHIVE_URL="https://github.com/${REPO}/archive"
 #   MSI_NO_INSTALL=1    compiler sans installer (pas de sudo nécessaire)
 #   MSI_KEEP_BUILD=1    conserver le répertoire de compilation
 #   MSI_SHA256=hex      somme de contrôle attendue de l'archive téléchargée
+#   MSI_SKIP_VERIFY=1   ignorer la vérification SHA-256 (déconseillé)
+#   MSI_ALLOW_UNVERIFIED=1  autoriser une branche sans release (non vérifié)
 # MSI_REF permet de choisir une autre référence (branche ou tag).
-MSI_REF="${MSI_REF:-v1.0.1}"
+MSI_REF="${MSI_REF:-v1.0.2}"
 MSI_PREFIX="${MSI_PREFIX:-}"
 MSI_JOBS="${MSI_JOBS:-}"
 MSI_SKIP_TESTS="${MSI_SKIP_TESTS:-0}"
@@ -62,7 +65,8 @@ install.sh — installe MSI Cooler Manager depuis les sources.
 
 Usage :
   ./install.sh [options]
-  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh -s -- [options]
+  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh -o install.sh
+  sh install.sh [options]      # après inspection du script
 
 Options :
   -h, --help        afficher cette aide
@@ -77,7 +81,9 @@ Options :
 Variables d'environnement équivalentes :
   MSI_REF, MSI_PREFIX, MSI_JOBS, MSI_SKIP_TESTS, MSI_NO_DEPS, MSI_NO_INSTALL,
   MSI_KEEP_BUILD (valeur 1 pour activer), MSI_SHA256 (somme de contrôle de
-  l'archive, ex. publiée dans les notes de version).
+  l'archive, prioritaire sur SHA256SUMS), MSI_SKIP_VERIFY=1 (ignorer la
+  vérification d'intégrité — déconseillé, incompatible avec MSI_SHA256),
+  MSI_ALLOW_UNVERIFIED=1 (autoriser une référence sans release).
 
 Après installation :
   sudo msi-cooler-manager          # nouvelle instance (droits root requis)
@@ -100,6 +106,16 @@ while [ $# -gt 0 ]; do
         *)              usage >&2; die "Option inconnue : $1" ;;
     esac
 done
+
+check_verification_options() {
+    # Une somme fournie à la main doit toujours être vérifiée : MSI_SKIP_VERIFY
+    # ne peut pas la neutraliser.
+    if [ -n "$MSI_SHA256" ] && [ "${MSI_SKIP_VERIFY:-0}" = "1" ]; then
+        die "MSI_SHA256 et MSI_SKIP_VERIFY=1 sont incompatibles : la somme fournie doit toujours être vérifiée."
+    fi
+}
+
+check_verification_options
 
 # ── Nettoyage ─────────────────────────────────────────────────────────────────
 WORK_DIR=""
@@ -265,20 +281,68 @@ download() { # $1 = url, $2 = destination
     fi
 }
 
-# Contrôle optionnel de l'archive : HTTPS protège le transport, la somme de
-# contrôle protège contre un dépôt ou un compte GitHub compromis.
-verify_archive() { # $1 = chemin de l'archive
-    [ -n "$MSI_SHA256" ] || return 0
+# Contrôle de l'archive : HTTPS protège le transport, la somme de contrôle
+# protège contre un dépôt ou un compte GitHub compromis.
+check_sha256() { # $1 = somme attendue, $2 = fichier
     if ! have sha256sum; then
-        warn "sha256sum introuvable : somme de contrôle non vérifiée."
+        die "sha256sum introuvable : impossible de vérifier l'intégrité. MSI_SKIP_VERIFY=1 pour passer outre (déconseillé)."
+    fi
+    printf '%s  %s\n' "$1" "$2" | sha256sum -c - >/dev/null 2>&1 || \
+        die "Somme de contrôle SHA-256 incorrecte.
+  Attendu : $1
+  Obtenu  : $(sha256sum "$2" 2>/dev/null | cut -d' ' -f1)
+Refusez l'installation ou utilisez MSI_SKIP_VERIFY=1 (déconseillé)."
+    good "Somme de contrôle SHA-256 vérifiée"
+}
+
+verify_archive() { # $1 = chemin de l'archive (référence sans release)
+    [ -n "$MSI_SHA256" ] || return 0
+    check_sha256 "$MSI_SHA256" "$1"
+}
+
+verify_release_archive() { # $1 = archive, $2 = URL de SHA256SUMS, $3 = nom de l'asset
+    if [ "${MSI_SKIP_VERIFY:-0}" = "1" ]; then
+        warn "Vérification SHA-256 ignorée (MSI_SKIP_VERIFY=1) : intégrité non garantie."
         return 0
     fi
-    printf '%s  %s\n' "$MSI_SHA256" "$1" | sha256sum -c - >/dev/null 2>&1 || \
-        die "Somme de contrôle SHA-256 incorrecte.
-  Attendu : $MSI_SHA256
-  Obtenu  : $(sha256sum "$1" 2>/dev/null | cut -d' ' -f1)
-Refusez l'installation ou vérifiez la valeur publiée par le mainteneur."
-    good "Somme de contrôle SHA-256 vérifiée"
+    # Une somme fournie explicitement reste prioritaire sur SHA256SUMS.
+    if [ -n "$MSI_SHA256" ]; then
+        check_sha256 "$MSI_SHA256" "$1"
+        return 0
+    fi
+    sums="$WORK_DIR/SHA256SUMS"
+    if ! download "$2" "$sums" >/dev/null 2>&1; then
+        die "SHA256SUMS introuvable ($2) : installation interrompue. MSI_SKIP_VERIFY=1 pour passer outre (déconseillé)."
+    fi
+    expected=$(awk -v name="$3" '$2 == name { print $1; exit }' "$sums")
+    if [ -z "$expected" ]; then
+        die "Aucune somme pour '$3' dans SHA256SUMS : installation interrompue. MSI_SKIP_VERIFY=1 pour passer outre (déconseillé)."
+    fi
+    check_sha256 "$expected" "$1"
+}
+
+# Le mode dépend de la forme de la référence demandée, jamais du résultat d'un
+# téléchargement : 'v' suivi d'un chiffre désigne une release.
+is_release_ref() { # $1 = référence
+    case "$1" in
+        v[0-9]*) return 0 ;;
+        *)       return 1 ;;
+    esac
+}
+
+require_unverified_consent() {
+    if [ "${MSI_ALLOW_UNVERIFIED:-0}" = "1" ]; then
+        warn "Référence '${MSI_REF}' sans release : installation non vérifiée (MSI_ALLOW_UNVERIFIED=1)."
+        return 0
+    fi
+    die "Référence '${MSI_REF}' sans release : installation non vérifiée refusée. Confirmez avec MSI_ALLOW_UNVERIFIED=1 (déconseillé)."
+}
+
+require_release_archive() { # $1 = chemin de l'archive
+    if ! download "${release_base}/${source_asset}" "$1" >/dev/null 2>&1; then
+        die "Asset de release introuvable (${release_base}/${source_asset}) : installation interrompue."
+    fi
+    verify_release_archive "$1" "${release_base}/SHA256SUMS" "$source_asset"
 }
 
 fetch_source() {
@@ -287,21 +351,39 @@ fetch_source() {
     info "Téléchargement des sources (${REPO} @ ${MSI_REF})"
     archive="$WORK_DIR/src.tar.gz"
     extracted=0
-    # La référence peut être une branche (refs/heads) ou un tag (refs/tags).
-    for kind in heads tags; do
-        if download "$ARCHIVE_URL/refs/$kind/$MSI_REF.tar.gz" "$archive" >/dev/null 2>&1; then
-            verify_archive "$archive"
-            mkdir -p "$WORK_DIR/src"
-            if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
-                extracted=1
-                break
-            fi
+    source_asset="msi-cooler-manager-${MSI_REF}-src.tar.gz"
+    release_base="https://github.com/${REPO}/releases/download/${MSI_REF}"
+
+    if is_release_ref "$MSI_REF"; then
+        info "Référence de release : ${MSI_REF} (vérification d'intégrité obligatoire)"
+        require_release_archive "$archive"
+        mkdir -p "$WORK_DIR/src"
+        if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
+            extracted=1
+        else
+            die "Archive de release invalide : extraction impossible."
         fi
-    done
+    else
+        # Branche ou référence non versionnée : aucun asset vérifiable, il faut
+        # une confirmation explicite avant d'utiliser l'archive auto-générée.
+        require_unverified_consent
+        # La référence peut être une branche (refs/heads) ou un tag (refs/tags).
+        for kind in heads tags; do
+            if download "$ARCHIVE_URL/refs/$kind/$MSI_REF.tar.gz" "$archive" >/dev/null 2>&1; then
+                verify_archive "$archive"
+                mkdir -p "$WORK_DIR/src"
+                if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
+                    extracted=1
+                    break
+                fi
+            fi
+        done
+    fi
     if [ "$extracted" -ne 1 ] && have git; then
         info "Archive indisponible, tentative via git clone"
+        warn "Clone git utilisé : le contenu n'est pas vérifié par SHA256SUMS (seul le nom de référence Git est utilisé)."
         if [ -n "$MSI_SHA256" ]; then
-            warn "Clone git utilisé : la somme de contrôle MSI_SHA256 ne s'applique pas (contenu authentifié par le commit Git)."
+            warn "MSI_SHA256 ne s'applique pas au clone git."
         fi
         rm -rf "$WORK_DIR/src"
         if git clone --depth 1 --branch "$MSI_REF" "$REPO_URL" "$WORK_DIR/src" >/dev/null 2>&1; then

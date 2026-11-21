@@ -36,3 +36,13 @@ CTestTestfile.cmake
 CMakeCache.txt
 cmake_install.cmake
 Makefile
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+*credentials*
+*.keystore
+google-services*.json
