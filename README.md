@@ -4,6 +4,12 @@ Gestionnaire de Cooler Boost pour laptops MSI — Qt6/QML, C++20.
 
 > **v1.0.1** : Linux uniquement (X11, ou XWayland) ; le démarrage d'une nouvelle instance exige les droits root. Voir [Limitations connues](#limitations-connues) et [docs/HARDWARE.md](docs/HARDWARE.md) pour la compatibilité matérielle documentée.
 
+## Démonstration
+
+![Démonstration de l'interface : panneau compact, déploiement de la vue étendue avec températures et seuils CPU/GPU, puis passage en mode MANUEL](resources/demo.gif)
+
+Capture réelle de l'interface (24 s, 1920 × 1080) : [voir la vidéo WebM](resources/demo.webm).
+
 ## Fonctionnalités
 
 - **Mode AUTO** : régulation thermique automatique selon des seuils CPU/GPU configurables (80 °C / 70 °C par défaut, bornes 30–100 °C)
@@ -143,7 +149,7 @@ src/
   db/       # Base de données (DatabaseManager, MetricsRepository)
   ui/       # Interface QML et services (ThemeManager, TrayManager, ShortcutManager, GlobalHotkey, ...)
 tests/      # Tests unitaires (Qt Test)
-resources/  # SVG, icônes
+resources/  # SVG, icônes et démonstration (demo.gif, demo.webm)
 docs/       # Documentation, dont le lanceur .desktop et HARDWARE.md
 ```
 
