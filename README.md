@@ -2,7 +2,7 @@
 
 Gestionnaire de Cooler Boost pour laptops MSI — Qt6/QML, C++20.
 
-> **v1.0.0** : Linux uniquement (X11, ou XWayland) ; le démarrage d'une nouvelle instance exige les droits root. Voir [Limitations connues](#limitations-connues) et [docs/HARDWARE.md](docs/HARDWARE.md) pour la compatibilité matérielle documentée.
+> **v1.0.1** : Linux uniquement (X11, ou XWayland) ; le démarrage d'une nouvelle instance exige les droits root. Voir [Limitations connues](#limitations-connues) et [docs/HARDWARE.md](docs/HARDWARE.md) pour la compatibilité matérielle documentée.
 
 ## Fonctionnalités
 
@@ -66,7 +66,7 @@ ctest --output-on-failure
 
 ### En une ligne
 
-Le script `install.sh` installe les dépendances, récupère les sources de la **release `v1.0.0`** (référence par défaut), compile, exécute les tests et installe :
+Le script `install.sh` installe les dépendances, récupère les sources de la **release `v1.0.1`** (référence par défaut), compile, exécute les tests et installe :
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh | sh
@@ -75,7 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-
 Le script étant versionné, il peut aussi être épinglé sur la release :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/v1.0.0/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/v1.0.1/install.sh | sh
 ```
 
 Options utiles (à passer après `sh -s --`) :
@@ -164,7 +164,7 @@ Les règles de compilation, de test et de signalement sont décrites dans [CONTR
 
 ## Release
 
-La version **v1.0.0** est la première version publique du projet (`project(... VERSION 1.0.0)`, `CMakeLists.txt:4`). Le détail des changements figure dans [CHANGELOG.md](CHANGELOG.md).
+La version **v1.0.1** est la version courante (`project(... VERSION 1.0.1)`, `CMakeLists.txt:4`) ; **v1.0.0** est la première version publique du projet. Le détail des changements figure dans [CHANGELOG.md](CHANGELOG.md).
 
 ## Licence
 

@@ -7,9 +7,21 @@ et le projet adhère au [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-21
+
 ### Added
 
-- Script d'installation `install.sh` exécutable en une ligne (`curl -fsSL .../install.sh | sh`) : installation des dépendances via `apt`/`dnf`/`pacman`/`zypper`, téléchargement des sources de la release **`v1.0.0`** par défaut (option `--ref` pour une autre branche ou un tag), compilation, tests et installation, avec options `--ref`, `--prefix`, `--jobs`, `--skip-tests`, `--no-deps`, `--no-install` et `--keep-build`.
+- Script d'installation `install.sh` exécutable en une ligne (`curl -fsSL .../install.sh | sh`) : installation des dépendances via `apt`/`dnf`/`pacman`/`zypper`, téléchargement des sources de la release **`v1.0.1`** par défaut (option `--ref` pour une autre branche ou un tag), compilation, tests et installation, avec options `--ref`, `--prefix`, `--jobs`, `--skip-tests`, `--no-deps`, `--no-install`, `--keep-build` et `MSI_SHA256` (contrôle de l'archive).
+- Vérification des modules QML requis à l'exécution (`check_qml_modules`), indépendante du gestionnaire de paquets.
+
+### Fixed
+
+- Installateur : les modules QML **`QtQuick.Templates`** et **`QtQml`** n'étaient pas installés (`--no-install-recommends` ne tire pas `qml6-module-qtquick-templates`, et `qml6-module-qtquick-controls` ne dépend que des bibliothèques C++) ; les types `QtQuick.Controls` étaient introuvables au chargement de l'interface (`module "QtQuick.Templates" plugin "qtquicktemplates2plugin" not found`).
+- Compilation : les avertissements issus du code généré par `qmlcachegen` (Qt 6.4, `-Wshadow`/`-Wconversion`) ne masquent plus ceux du projet — 416 avertissements → 0, les flags stricts restant actifs sur `src/**` et `tests/**`.
+
+### Known limitations
+
+- `qml6-module-qtquick-templates` et `qml6-module-qtqml` ne sont installés explicitement que pour `apt` ; sur les autres gestionnaires de paquets, `check_qml_modules` avertit si le module manque.
 
 ## [1.0.0] - 2026-11-21
 
