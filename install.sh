@@ -21,7 +21,7 @@ REPO_URL="https://github.com/${REPO}.git"
 ARCHIVE_URL="https://github.com/${REPO}/archive"
 
 # ── Défauts, surchargeables par variables d'environnement ─────────────────────
-#   MSI_REF=v1.0.0      référence Git à installer (branche ou tag)
+#   MSI_REF=v1.0.1      référence Git à installer (branche ou tag)
 #   MSI_PREFIX=         préfixe d'installation (défaut : préfixe CMake, /usr/local)
 #   MSI_JOBS=n          nombre de cœurs de compilation parallèle
 #   MSI_SKIP_TESTS=1    ne pas exécuter ctest
@@ -30,7 +30,7 @@ ARCHIVE_URL="https://github.com/${REPO}/archive"
 #   MSI_KEEP_BUILD=1    conserver le répertoire de compilation
 #   MSI_SHA256=hex      somme de contrôle attendue de l'archive téléchargée
 # MSI_REF permet de choisir une autre référence (branche ou tag).
-MSI_REF="${MSI_REF:-v1.0.0}"
+MSI_REF="${MSI_REF:-v1.0.1}"
 MSI_PREFIX="${MSI_PREFIX:-}"
 MSI_JOBS="${MSI_JOBS:-}"
 MSI_SKIP_TESTS="${MSI_SKIP_TESTS:-0}"

@@ -1,6 +1,6 @@
 # Contribuer à MSI Cooler Manager
 
-Merci de votre intérêt ! Ce projet cible la version **v1.0.0** et fonctionne uniquement sur Linux/X11, avec exécution en root. Avant toute contribution, lisez le [README.md](README.md) et [docs/HARDWARE.md](docs/HARDWARE.md).
+Merci de votre intérêt ! Ce projet cible la version **v1.0.1** et fonctionne uniquement sur Linux/X11, avec exécution en root. Avant toute contribution, lisez le [README.md](README.md) et [docs/HARDWARE.md](docs/HARDWARE.md).
 
 ## Prérequis
 
