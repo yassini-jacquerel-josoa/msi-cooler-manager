@@ -9,6 +9,9 @@
 #include <QLocalSocket>
 
 #include <cstdio>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "core/CoolerBoostController.h"
@@ -25,6 +28,44 @@
 #include "ui/BackdropBlur.h"
 
 using namespace msi;
+
+namespace {
+
+// L'instance root est lancée via sudo ou pkexec (README et lanceur .desktop) :
+// ces outils exposent l'UID de la session dans l'environnement. Sans valeur
+// exploitable, seul root est autorisé.
+uid_t sessionUid()
+{
+    bool ok = false;
+    const int sudoUid = qEnvironmentVariableIntValue("SUDO_UID", &ok);
+    if (ok && sudoUid > 0)
+        return static_cast<uid_t>(sudoUid);
+    const int pkexecUid = qEnvironmentVariableIntValue("PKEXEC_UID", &ok);
+    if (ok && pkexecUid > 0)
+        return static_cast<uid_t>(pkexecUid);
+    return static_cast<uid_t>(-1);
+}
+
+// Qt 6.4 n'expose pas QLocalSocket::peerCredentials() : les identifiants du
+// pair sont lus directement via SO_PEERCRED sur le descripteur Unix.
+uid_t peerUid(QLocalSocket *socket, bool &ok)
+{
+    ok = false;
+    if (socket->socketDescriptor() < 0)
+        return static_cast<uid_t>(-1);
+
+    struct ucred credentials{};
+    socklen_t length = sizeof(credentials);
+    if (::getsockopt(static_cast<int>(socket->socketDescriptor()), SOL_SOCKET, SO_PEERCRED,
+                     &credentials, &length) != 0
+        || length < sizeof(credentials)) {
+        return static_cast<uid_t>(-1);
+    }
+    ok = true;
+    return credentials.uid;
+}
+
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -88,15 +129,40 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    const uid_t allowedSessionUid = sessionUid();
+
+    // Contrôle juste avant removeServer() : si une instance est apparue entre
+    // temps, on lui transmet la commande plutôt que de lui prendre le socket.
+    {
+        QLocalSocket socket;
+        socket.connectToServer(serverName);
+        if (socket.waitForConnected(300))
+            return sendToRunning(socket);
+    }
+
     QLocalServer::removeServer(serverName);
     QLocalServer *server = new QLocalServer(&app);
-    if (!server->listen(serverName)) {
+    // umask 0177 : le socket Unix naît directement en 0600 (0777 & ~0177),
+    // sans intervalle où il serait accessible à d'autres utilisateurs.
+    const mode_t previousUmask = umask(0177);
+    const bool listening = server->listen(serverName);
+    umask(previousUmask);
+    if (!listening) {
         QLocalSocket socket;
         socket.connectToServer(serverName);
         if (socket.waitForConnected(300))
             return sendToRunning(socket);
         std::fprintf(stderr, "Impossible de démarrer MSI Cooler Manager.\n");
         return 1;
+    }
+
+    // Root peut toujours se connecter ; l'utilisateur de session (sudo/pkexec)
+    // devient propriétaire du socket 0600 pour envoyer ses propres commandes.
+    if (allowedSessionUid != static_cast<uid_t>(-1)) {
+        const QByteArray socketPath = server->fullServerName().toUtf8();
+        if (::chown(socketPath.constData(), allowedSessionUid, static_cast<gid_t>(-1)) != 0) {
+            qWarning().noquote() << "IPC: impossible de donner le socket à l'utilisateur de session.";
+        }
     }
 
     // F7 ne doit plus être pris par « Déplacer la fenêtre » ni par un raccourci GNOME.
@@ -171,6 +237,20 @@ int main(int argc, char *argv[])
     QObject::connect(server, &QLocalServer::newConnection, [&]() {
         QLocalSocket *client = server->nextPendingConnection();
         if (!client) return;
+        QObject::connect(client, &QLocalSocket::disconnected, client, &QObject::deleteLater);
+
+        bool peerKnown = false;
+        const uid_t peer = peerUid(client, peerKnown);
+        const bool authorized = peerKnown
+                                && (peer == 0
+                                    || (allowedSessionUid != static_cast<uid_t>(-1)
+                                        && peer == allowedSessionUid));
+        if (!authorized) {
+            qWarning().noquote() << "IPC: connexion refusée (pair non autorisé).";
+            client->disconnectFromServer();
+            return;
+        }
+
         QObject::connect(client, &QLocalSocket::readyRead, [client, &controller, &mainWindow]() {
             const QString cmd = QString::fromUtf8(client->readAll()).trimmed();
             if (cmd == QLatin1String("toggle")) {
@@ -185,8 +265,13 @@ int main(int argc, char *argv[])
             else if (cmd == QLatin1String("expand")) {
                 if (mainWindow)
                     QMetaObject::invokeMethod(mainWindow, "handleLongF7");
-            } else if (cmd == QLatin1String("quit"))
-                QCoreApplication::quit();
+            } else if (cmd == QLatin1String("quit")) {
+                bool quitPeerKnown = false;
+                if (peerUid(client, quitPeerKnown) == 0 && quitPeerKnown)
+                    QCoreApplication::quit();
+                else
+                    qWarning().noquote() << "IPC: commande 'quit' refusée (pair non root).";
+            }
             client->disconnectFromServer();
         });
     });

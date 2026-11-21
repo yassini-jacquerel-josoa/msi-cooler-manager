@@ -26,7 +26,7 @@ Capture réelle de l'interface (24 s, 1920 × 1080) : [voir la vidéo WebM](reso
 ### Système et matériel
 
 - **Linux avec session X11** (ou XWayland) : l'éditeur de liens rajoute `xcb` et `X11` de façon inconditionnelle (`CMakeLists.txt:91-92`) et le raccourci global utilise X11/xcb (`src/ui/GlobalHotkey.cpp:8`, `:58`). **Windows n'est pas pris en charge** : `src/main.cpp:12` inclut `<unistd.h>` et `src/main.cpp:86` appelle `geteuid()`.
-- **Droits root** pour démarrer une nouvelle instance : le contrôle de l'UID effectif intervient après la gestion de l'IPC (`src/main.cpp:81-88`), donc une commande CLI peut atteindre une instance déjà lancée même sans root. Le fichier `.desktop` fourni utilise `pkexec` (`docs/msi-cooler-manager.desktop:5`).
+- **Droits root** pour démarrer une nouvelle instance : le contrôle de l'UID effectif intervient après la gestion de l'IPC. Le socket local est créé en 0600 et chaque connexion est authentifiée : seuls root et l'utilisateur de la session qui a lancé l'instance (UID transmis par `sudo`/`pkexec` via `SUDO_UID` ou `PKEXEC_UID`) peuvent envoyer des commandes ; `quit` est réservé à root. Le fichier `.desktop` fourni utilise `pkexec` (`docs/msi-cooler-manager.desktop:5`).
 - **Module noyau `msi-ec`** exposant `/sys/devices/platform/msi-ec/cooler_boost` en lecture et en écriture ; c'est le seul point d'accès au Cooler Boost (`src/core/HardwareAbstraction.cpp`).
 - **Capteur CPU** : une zone thermique est détectée dans `/sys/class/thermal/thermal_zone*` (types `x86_pkg_temp`, `cpu_thermal`, `k10temp`, `TCPU`), avec repli sur `thermal_zone0` (`src/core/HardwareAbstraction.cpp:124-157`) ; les valeurs sysfs sont en millidegrés.
 - **Température GPU** : `nvidia-smi` est essayé en premier, puis un capteur `hwmon` présomptif de GPU est recherché dans `/sys/class/hwmon/` (`src/core/HardwareAbstraction.cpp:159-259`). Si aucune source n'est disponible, les lectures GPU restent indisponibles et n'alimentent pas l'historique.
@@ -120,7 +120,7 @@ pkexec msi-cooler-manager
 
 ### Commandes CLI
 
-Une seule instance peut tourner (`msi_cooler_manager_ipc`, `src/main.cpp:44`). Tant que l'instance est active, chaque commande lui est transmise via IPC, avant même le contrôle des droits root (`src/main.cpp:61-88`, `:171-192`) : un utilisateur non root peut donc envoyer une commande à l'instance existante, mais `sudo` reste recommandé. Sans instance active, `sudo` est obligatoire et la commande est appliquée au démarrage de l'interface (`src/main.cpp:138-143`) :
+Une seule instance peut tourner (`msi_cooler_manager_ipc`, `src/main.cpp`). Chaque connexion au socket local est authentifiée via `SO_PEERCRED` : l'identité du pair doit être root ou l'UID de la session qui a lancé l'instance (`SUDO_UID` / `PKEXEC_UID`) ; toute autre connexion est refusée et journalisée. Le socket est créé directement en 0600 (`umask 0177`) et appartient à l'utilisateur de session, auquel root conserve toujours l'accès. La commande `quit` est réservée à root. Sans instance active, `sudo` est obligatoire et la commande est appliquée au démarrage de l'interface :
 
 ```bash
 sudo msi-cooler-manager --toggle   # ou -t : bascule AUTO / MANUEL
@@ -156,7 +156,7 @@ docs/       # Documentation, dont le lanceur .desktop et HARDWARE.md
 ## Limitations connues
 
 - Plateforme : **Linux/X11 uniquement** ; pas de support Wayland natif ni de support Windows. Sous XWayland, la capture globale de F7 peut échouer et le repli `Alt+F7` n'est installé que sur GNOME.
-- Privilèges : l'interface et le contrôle matériel tournent en root, y compris le moteur QML et les processus `gsettings` ; seules les commandes IPC peuvent être envoyées par un utilisateur non root.
+- Privilèges : l'interface et le contrôle matériel tournent en root, y compris le moteur QML et les processus `gsettings` ; l'IPC n'accepte que root et l'utilisateur de session qui a lancé l'instance (socket 0600, authentification `SO_PEERCRED`), et `quit` reste réservé à root.
 - Matériel : le Cooler Boost est piloté uniquement via `/sys/devices/platform/msi-ec/cooler_boost`. La zone CPU est détectée dynamiquement (repli `thermal_zone0`) et le GPU utilise `nvidia-smi` puis un capteur `hwmon` présomptif ; sans module `msi-ec`, la régulation est inactive. Le repli `hwmon` repose sur une présomption de capteur GPU et n'a pas de validation matérielle universelle.
 - Mesures : les seuils sont limités à 30–100 °C (`src/core/CoolerBoostController.cpp:88`, `:96`) ; l'historique affiché est un tampon glissant de 5 minutes (`src/core/TemperatureMonitor.cpp:9`) et aucune courbe n'est tracée dans l'interface.
 - Thème : détection fondée sur `gsettings` (GNOME) avec repli sur la palette Qt ; la préférence `theme/dark` est stockée par `SettingsManager` (`src/core/SettingsManager.cpp:12-23`) mais la détection système l'écrase au démarrage (`src/ui/ThemeManager.cpp:129-163`).
