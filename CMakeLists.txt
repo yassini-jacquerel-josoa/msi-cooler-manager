@@ -191,6 +191,32 @@ if(BUILD_TESTS)
     set_tests_properties(DatabaseTests PROPERTIES LABELS "database")
 endif()
 
+# ── Code généré par Qt : avertissements neutralisés ──────────────────────────
+# Les sources produites par qmlcachegen et AUTOMOC (.rcc/qmlcache/*,
+# *_autogen/, mocs_compilation.cpp) ne relèvent pas du projet. Qt 6.4 y génère
+# des lambdas qui redéclarent leurs paramètres (-Wshadow, ~414 occurrences)
+# et des conversions qsizetype -> int (-Wconversion). On applique -w à ces
+# seules sources : le jurnal de compilation reste lisible et seuls les
+# avertissements du code maison subsistent.
+if(ENABLE_WARNINGS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    get_property(_msi_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(_msi_target IN LISTS _msi_targets)
+        get_target_property(_msi_sources ${_msi_target} SOURCES)
+        if(_msi_sources)
+            foreach(_msi_source IN LISTS _msi_sources)
+                get_source_file_property(_msi_generated "${_msi_source}" GENERATED)
+                if(_msi_generated OR _msi_source MATCHES "(^|/)[.]rcc/|qmlcache|_autogen|mocs_compilation")
+                    set_property(SOURCE "${_msi_source}" APPEND PROPERTY COMPILE_OPTIONS -w)
+                endif()
+            endforeach()
+        endif()
+    endforeach()
+    unset(_msi_targets)
+    unset(_msi_sources)
+    unset(_msi_source)
+    unset(_msi_generated)
+endif()
+
 # ── Installation ─────────────────────────────────────────────────────────────
 if(MSI_GUI_ENABLED)
     install(TARGETS msi-cooler-manager RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

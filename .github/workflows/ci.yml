@@ -45,7 +45,10 @@ jobs:
             libxcb-keysyms1-dev \
             libxkbcommon-x11-dev \
             qml6-module-qtquick-controls \
-            qml6-module-qtquick-layouts
+            qml6-module-qtquick-layouts \
+            qml6-module-qtquick-window \
+            qml6-module-qtquick-templates \
+            qml6-module-qtqml
 
       - name: Configure
         run: >
