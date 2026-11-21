@@ -265,20 +265,43 @@ download() { # $1 = url, $2 = destination
     fi
 }
 
-# Contrôle optionnel de l'archive : HTTPS protège le transport, la somme de
-# contrôle protège contre un dépôt ou un compte GitHub compromis.
-verify_archive() { # $1 = chemin de l'archive
-    [ -n "$MSI_SHA256" ] || return 0
+# Contrôle de l'archive : HTTPS protège le transport, la somme de contrôle
+# protège contre un dépôt ou un compte GitHub compromis.
+check_sha256() { # $1 = somme attendue, $2 = fichier
     if ! have sha256sum; then
         warn "sha256sum introuvable : somme de contrôle non vérifiée."
         return 0
     fi
-    printf '%s  %s\n' "$MSI_SHA256" "$1" | sha256sum -c - >/dev/null 2>&1 || \
+    printf '%s  %s\n' "$1" "$2" | sha256sum -c - >/dev/null 2>&1 || \
         die "Somme de contrôle SHA-256 incorrecte.
-  Attendu : $MSI_SHA256
-  Obtenu  : $(sha256sum "$1" 2>/dev/null | cut -d' ' -f1)
+  Attendu : $1
+  Obtenu  : $(sha256sum "$2" 2>/dev/null | cut -d' ' -f1)
 Refusez l'installation ou vérifiez la valeur publiée par le mainteneur."
     good "Somme de contrôle SHA-256 vérifiée"
+}
+
+verify_archive() { # $1 = chemin de l'archive
+    [ -n "$MSI_SHA256" ] || return 0
+    check_sha256 "$MSI_SHA256" "$1"
+}
+
+verify_archive_from_release() { # $1 = chemin de l'archive
+    # Une somme fournie explicitement reste prioritaire.
+    if [ -n "$MSI_SHA256" ]; then
+        return 0
+    fi
+    sums="$WORK_DIR/SHA256SUMS"
+    sums_url="https://github.com/${REPO}/releases/download/${MSI_REF}/SHA256SUMS"
+    if ! download "$sums_url" "$sums" >/dev/null 2>&1; then
+        warn "SHA256SUMS indisponible ($sums_url) : intégrité de l'archive non vérifiée."
+        return 0
+    fi
+    expected=$(awk -v name="$(basename "$1")" '$2 == name { print $1; exit }' "$sums")
+    if [ -z "$expected" ]; then
+        warn "Aucune somme pour $(basename "$1") dans SHA256SUMS : intégrité non vérifiée."
+        return 0
+    fi
+    check_sha256 "$expected" "$1"
 }
 
 fetch_source() {
@@ -291,6 +314,7 @@ fetch_source() {
     for kind in heads tags; do
         if download "$ARCHIVE_URL/refs/$kind/$MSI_REF.tar.gz" "$archive" >/dev/null 2>&1; then
             verify_archive "$archive"
+            verify_archive_from_release "$archive"
             mkdir -p "$WORK_DIR/src"
             if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
                 extracted=1
@@ -300,8 +324,9 @@ fetch_source() {
     done
     if [ "$extracted" -ne 1 ] && have git; then
         info "Archive indisponible, tentative via git clone"
+        warn "Clone git utilisé : le contenu n'est pas vérifié par SHA256SUMS (seul le nom de référence Git est utilisé)."
         if [ -n "$MSI_SHA256" ]; then
-            warn "Clone git utilisé : la somme de contrôle MSI_SHA256 ne s'applique pas (contenu authentifié par le commit Git)."
+            warn "MSI_SHA256 ne s'applique pas au clone git."
         fi
         rm -rf "$WORK_DIR/src"
         if git clone --depth 1 --branch "$MSI_REF" "$REPO_URL" "$WORK_DIR/src" >/dev/null 2>&1; then

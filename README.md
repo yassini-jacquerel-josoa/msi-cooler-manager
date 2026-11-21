@@ -70,28 +70,33 @@ ctest --output-on-failure
 
 ## Installation
 
-### En une ligne
+### Télécharger, inspecter, exécuter
 
-Le script `install.sh` installe les dépendances, récupère les sources de la **release `v1.0.1`** (référence par défaut), compile, exécute les tests et installe :
+Le script `install.sh` installe les dépendances, récupère les sources de la **release `v1.0.1`** (référence par défaut), compile, exécute les tests et installe. Téléchargez-le, lisez-le, puis exécutez-le :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/main/install.sh -o install.sh
+less install.sh          # inspecter le script avant de l'exécuter
+sh install.sh
 ```
 
 Le script étant versionné, il peut aussi être épinglé sur la release :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/v1.0.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/yassini-jacquerel-josoa/msi-cooler-manager/v1.0.1/install.sh -o install.sh
+sh install.sh
 ```
 
-Options utiles (à passer après `sh -s --`) :
+Options utiles (à passer à `sh install.sh`) :
 
 ```bash
-curl -fsSL .../install.sh | sh -s -- --ref main      # dernière version de développement
-curl -fsSL .../install.sh | sh -s -- --skip-tests    # ne pas exécuter ctest
-curl -fsSL .../install.sh | sh -s -- --no-install    # compiler sans installer (aucun sudo)
-curl -fsSL .../install.sh | sh -s -- --help          # toutes les options
+sh install.sh --ref main      # dernière version de développement
+sh install.sh --skip-tests    # ne pas exécuter ctest
+sh install.sh --no-install    # compiler sans installer (aucun sudo)
+sh install.sh --help          # toutes les options
 ```
+
+Le script télécharge aussi le fichier `SHA256SUMS` publié avec la release et vérifie l'archive avant extraction ; une somme fournie explicitement via `MSI_SHA256` reste prioritaire. Le repli `git clone` reste utilisable mais n'offre pas cette vérification : un avertissement est alors affiché.
 
 Le script est en POSIX sh (dash/bash/ash), détecte le gestionnaire de paquets (`apt`, `dnf`, `pacman`, `zypper`), télécharge les sources dans un répertoire temporaire (nettoyé à la fin) et vérifie la présence de `msi-ec`. Depuis un clone local, `./install.sh` utilise directement l'arbre de travail. Sans gestionnaire de paquets reconnu ou sans `sudo`, il affiche les prérequis du README et s'arrête.
 

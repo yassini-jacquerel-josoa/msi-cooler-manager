@@ -56,7 +56,7 @@ jobs:
       - name: Tests
         run: ctest --test-dir build --output-on-failure
 
-      - name: Create tarball and checksum
+      - name: Create tarball and checksums
         run: |
           set -euo pipefail
           PACKAGE="msi-cooler-manager-${GITHUB_REF_NAME}-${GITHUB_RUN_NUMBER}"
@@ -65,7 +65,8 @@ jobs:
           cmake --install build --prefix "${STAGE}/usr"
           tar -czf "dist/${PACKAGE}.tar.gz" -C "${STAGE}" .
           (cd dist && sha256sum "${PACKAGE}.tar.gz" > "${PACKAGE}.tar.gz.sha256")
-          cat "dist/${PACKAGE}.tar.gz.sha256"
+          (cd dist && sha256sum "${PACKAGE}.tar.gz" > SHA256SUMS)
+          cat "dist/SHA256SUMS"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -74,5 +75,6 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
+            dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
