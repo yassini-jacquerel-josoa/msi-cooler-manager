@@ -1,7 +1,8 @@
 name: Release package
 
-# Paquet local uniquement : déclenchement manuel, dépôt en artifact de workflow.
-# Aucune publication de release GitHub n'est effectuée.
+# Publication manuelle : le paquet, l'archive source et SHA256SUMS sont
+# publiés comme assets de la release GitHub (en plus de l'artifact de workflow).
+# À déclencher sur un tag : le nom du tag sert de nom de release et d'asset.
 on:
   workflow_dispatch:
 
@@ -12,6 +13,8 @@ jobs:
   package:
     name: Build release tarball
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       QT_QPA_PLATFORM: offscreen
 
@@ -56,25 +59,42 @@ jobs:
       - name: Tests
         run: ctest --test-dir build --output-on-failure
 
-      - name: Create tarball and checksums
+      - name: Create source archive, package and checksums
         run: |
           set -euo pipefail
           PACKAGE="msi-cooler-manager-${GITHUB_REF_NAME}-${GITHUB_RUN_NUMBER}"
+          SOURCE_ARCHIVE="msi-cooler-manager-${GITHUB_REF_NAME}-src.tar.gz"
+          PREFIX="msi-cooler-manager-${GITHUB_REF_NAME}/"
           STAGE="${RUNNER_TEMP}/${PACKAGE}"
           mkdir -p "${STAGE}" dist
           cmake --install build --prefix "${STAGE}/usr"
           tar -czf "dist/${PACKAGE}.tar.gz" -C "${STAGE}" .
+          # Archive produite par le workflow (contenu stable), pas générée par
+          # GitHub au téléchargement. Le préfixe est retiré par install.sh.
+          git archive --format=tar.gz --prefix="${PREFIX}" -o "dist/${SOURCE_ARCHIVE}" "${GITHUB_REF_NAME}" \
+            || git archive --format=tar.gz --prefix="${PREFIX}" -o "dist/${SOURCE_ARCHIVE}" HEAD
+          (cd dist && sha256sum "${PACKAGE}.tar.gz" "${SOURCE_ARCHIVE}" > SHA256SUMS)
           (cd dist && sha256sum "${PACKAGE}.tar.gz" > "${PACKAGE}.tar.gz.sha256")
-          (cd dist && sha256sum "${PACKAGE}.tar.gz" > SHA256SUMS)
-          # install.sh télécharge l'archive source GitHub : sa somme doit
-          # figurer dans SHA256SUMS pour être vérifiée de bout en bout.
-          if curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz" -o src.tar.gz; then
-            sha256sum src.tar.gz >> dist/SHA256SUMS
-            rm -f src.tar.gz
+          cat dist/SHA256SUMS
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PACKAGE="msi-cooler-manager-${GITHUB_REF_NAME}-${GITHUB_RUN_NUMBER}"
+          SOURCE_ARCHIVE="msi-cooler-manager-${GITHUB_REF_NAME}-src.tar.gz"
+          ASSETS=(
+            "dist/${PACKAGE}.tar.gz"
+            "dist/${SOURCE_ARCHIVE}"
+            "dist/SHA256SUMS"
+          )
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --clobber "${ASSETS[@]}"
           else
-            echo "Archive source introuvable pour ${GITHUB_REF_NAME}."
+            gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
+              --title "${GITHUB_REF_NAME}" --generate-notes "${ASSETS[@]}"
           fi
-          cat "dist/SHA256SUMS"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

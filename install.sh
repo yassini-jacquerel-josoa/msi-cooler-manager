@@ -269,37 +269,38 @@ download() { # $1 = url, $2 = destination
 # protège contre un dépôt ou un compte GitHub compromis.
 check_sha256() { # $1 = somme attendue, $2 = fichier
     if ! have sha256sum; then
-        warn "sha256sum introuvable : somme de contrôle non vérifiée."
-        return 0
+        die "sha256sum introuvable : impossible de vérifier l'intégrité. MSI_SKIP_VERIFY=1 pour passer outre (déconseillé)."
     fi
     printf '%s  %s\n' "$1" "$2" | sha256sum -c - >/dev/null 2>&1 || \
         die "Somme de contrôle SHA-256 incorrecte.
   Attendu : $1
   Obtenu  : $(sha256sum "$2" 2>/dev/null | cut -d' ' -f1)
-Refusez l'installation ou vérifiez la valeur publiée par le mainteneur."
+Refusez l'installation ou utilisez MSI_SKIP_VERIFY=1 (déconseillé)."
     good "Somme de contrôle SHA-256 vérifiée"
 }
 
-verify_archive() { # $1 = chemin de l'archive
+verify_archive() { # $1 = chemin de l'archive (référence sans release)
     [ -n "$MSI_SHA256" ] || return 0
     check_sha256 "$MSI_SHA256" "$1"
 }
 
-verify_archive_from_release() { # $1 = chemin de l'archive
-    # Une somme fournie explicitement reste prioritaire.
+verify_release_archive() { # $1 = archive, $2 = URL de SHA256SUMS, $3 = nom de l'asset
+    if [ "${MSI_SKIP_VERIFY:-0}" = "1" ]; then
+        warn "Vérification SHA-256 ignorée (MSI_SKIP_VERIFY=1) : intégrité non garantie."
+        return 0
+    fi
+    # Une somme fournie explicitement reste prioritaire sur SHA256SUMS.
     if [ -n "$MSI_SHA256" ]; then
+        check_sha256 "$MSI_SHA256" "$1"
         return 0
     fi
     sums="$WORK_DIR/SHA256SUMS"
-    sums_url="https://github.com/${REPO}/releases/download/${MSI_REF}/SHA256SUMS"
-    if ! download "$sums_url" "$sums" >/dev/null 2>&1; then
-        warn "SHA256SUMS indisponible ($sums_url) : intégrité de l'archive non vérifiée."
-        return 0
+    if ! download "$2" "$sums" >/dev/null 2>&1; then
+        die "SHA256SUMS introuvable ($2) : installation interrompue. MSI_SKIP_VERIFY=1 pour passer outre (déconseillé)."
     fi
-    expected=$(awk -v name="$(basename "$1")" '$2 == name { print $1; exit }' "$sums")
+    expected=$(awk -v name="$3" '$2 == name { print $1; exit }' "$sums")
     if [ -z "$expected" ]; then
-        warn "Aucune somme pour $(basename "$1") dans SHA256SUMS : intégrité non vérifiée."
-        return 0
+        die "Aucune somme pour '$3' dans SHA256SUMS : installation interrompue. MSI_SKIP_VERIFY=1 pour passer outre (déconseillé)."
     fi
     check_sha256 "$expected" "$1"
 }
@@ -310,18 +311,35 @@ fetch_source() {
     info "Téléchargement des sources (${REPO} @ ${MSI_REF})"
     archive="$WORK_DIR/src.tar.gz"
     extracted=0
-    # La référence peut être une branche (refs/heads) ou un tag (refs/tags).
-    for kind in heads tags; do
-        if download "$ARCHIVE_URL/refs/$kind/$MSI_REF.tar.gz" "$archive" >/dev/null 2>&1; then
-            verify_archive "$archive"
-            verify_archive_from_release "$archive"
-            mkdir -p "$WORK_DIR/src"
-            if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
-                extracted=1
-                break
-            fi
+    source_asset="msi-cooler-manager-${MSI_REF}-src.tar.gz"
+    release_base="https://github.com/${REPO}/releases/download/${MSI_REF}"
+
+    # L'asset de release est la source de vérité : son existence signale une
+    # release, et son absence une référence sans release (une branche, par
+    # exemple). On ne retombe sur l'archive auto-générée que dans ce second cas.
+    if download "${release_base}/${source_asset}" "$archive" >/dev/null 2>&1; then
+        info "Archive de release détectée : ${source_asset}"
+        verify_release_archive "$archive" "${release_base}/SHA256SUMS" "$source_asset"
+        mkdir -p "$WORK_DIR/src"
+        if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
+            extracted=1
+        else
+            die "Archive de release invalide : extraction impossible."
         fi
-    done
+    else
+        warn "Aucune archive de release pour '${MSI_REF}' : repli sur l'archive auto-générée par GitHub (contenu non garanti stable, intégrité non vérifiable)."
+        # La référence peut être une branche (refs/heads) ou un tag (refs/tags).
+        for kind in heads tags; do
+            if download "$ARCHIVE_URL/refs/$kind/$MSI_REF.tar.gz" "$archive" >/dev/null 2>&1; then
+                verify_archive "$archive"
+                mkdir -p "$WORK_DIR/src"
+                if tar -xzf "$archive" -C "$WORK_DIR/src" --strip-components=1 2>/dev/null; then
+                    extracted=1
+                    break
+                fi
+            fi
+        done
+    fi
     if [ "$extracted" -ne 1 ] && have git; then
         info "Archive indisponible, tentative via git clone"
         warn "Clone git utilisé : le contenu n'est pas vérifié par SHA256SUMS (seul le nom de référence Git est utilisé)."
